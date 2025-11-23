@@ -1,0 +1,244 @@
+using AutoMapper;
+using Email.Server.Data;
+using Email.Server.DTOs.Requests;
+using Email.Server.DTOs.Responses;
+using Email.Server.Models;
+using Email.Server.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace Email.Server.Services.Implementations;
+
+public class DomainManagementService : IDomainManagementService
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ITenantContextService _tenantContext;
+    private readonly ISesClientService _sesClient;
+    private readonly IMapper _mapper;
+    private readonly ILogger<DomainManagementService> _logger;
+
+    public DomainManagementService(
+        ApplicationDbContext context,
+        ITenantContextService tenantContext,
+        ISesClientService sesClient,
+        IMapper mapper,
+        ILogger<DomainManagementService> logger)
+    {
+        _context = context;
+        _tenantContext = tenantContext;
+        _sesClient = sesClient;
+        _mapper = mapper;
+        _logger = logger;
+    }
+
+    public async Task<DomainResponse> CreateDomainAsync(CreateDomainRequest request, CancellationToken cancellationToken = default)
+    {
+        var tenantId = _tenantContext.GetTenantId();
+
+        // Check if domain already exists for this tenant
+        var existingDomain = await _context.Domains
+            .FirstOrDefaultAsync(d => d.TenantId == tenantId && d.Domain == request.Domain && d.Region == request.Region, cancellationToken);
+
+        if (existingDomain != null)
+        {
+            throw new InvalidOperationException($"Domain {request.Domain} already exists in region {request.Region}");
+        }
+
+        // Get the SesRegion for this tenant and region
+        var sesRegion = await _context.SesRegions
+            .FirstOrDefaultAsync(sr => sr.TenantId == tenantId && sr.Region == request.Region, cancellationToken);
+
+        if (sesRegion == null)
+        {
+            throw new InvalidOperationException($"Region {request.Region} is not enabled for this tenant");
+        }
+
+        // Check if a default ConfigSet exists for this SesRegion
+        var existingConfigSet = await _context.ConfigSets
+            .FirstOrDefaultAsync(cs => cs.SesRegionId == sesRegion.Id && cs.IsDefault, cancellationToken);
+
+        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            // If no default ConfigSet exists, create one in AWS and database
+            if (existingConfigSet == null)
+            {
+                var configSetName = $"tenant-{tenantId}-{request.Region}";
+
+                _logger.LogInformation("Creating SES configuration set {ConfigSetName} for tenant {TenantId}", configSetName, tenantId);
+
+                // Create configuration set in AWS SES
+                await _sesClient.CreateConfigurationSetAsync(configSetName, cancellationToken);
+
+                // Create ConfigSet entity in database
+                var configSet = new ConfigSets
+                {
+                    SesRegionId = sesRegion.Id,
+                    Name = $"Default Configuration Set",
+                    ConfigSetName = configSetName,
+                    IsDefault = true,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+
+                _context.ConfigSets.Add(configSet);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation("Created configuration set {ConfigSetName} for tenant {TenantId} in region {Region}",
+                    configSetName, tenantId, request.Region);
+            }
+
+            // Create SES email identity
+            var sesResponse = await _sesClient.CreateEmailIdentityAsync(request.Domain, cancellationToken);
+
+            // Create domain entity
+            var domain = new Domains
+            {
+                TenantId = tenantId,
+                Domain = request.Domain,
+                Region = request.Region,
+                VerificationStatus = 0, // Pending
+                DkimMode = 1, // Easy DKIM
+                DkimStatus = 0, // Pending
+                MailFromStatus = 0, // Off
+                IdentityArn = sesResponse.IdentityType?.ToString(),
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            _context.Domains.Add(domain);
+
+            // Add DNS records from SES response
+            if (sesResponse.DkimAttributes?.Tokens != null)
+            {
+                foreach (var token in sesResponse.DkimAttributes.Tokens)
+                {
+                    var dnsRecord = new DomainDnsRecords
+                    {
+                        DomainId = domain.Id,
+                        RecordType = "CNAME",
+                        Host = $"{token}._domainkey.{request.Domain}",
+                        Value = $"{token}.dkim.amazonses.com",
+                        Required = true,
+                        Status = 0 // Unknown
+                    };
+                    _context.DomainDnsRecords.Add(dnsRecord);
+                }
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            _logger.LogInformation("Created domain {Domain} for tenant {TenantId}", request.Domain, tenantId);
+
+            return await GetDomainAsync(domain.Id, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            _logger.LogError(ex, "Error creating domain {Domain} for tenant {TenantId}. Transaction rolled back.", request.Domain, tenantId);
+            throw;
+        }
+    }
+
+    public async Task<DomainResponse> GetDomainAsync(Guid domainId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = _tenantContext.GetTenantId();
+
+        var domain = await _context.Domains
+            .Include(d => d.RegionCatalog)
+            .FirstOrDefaultAsync(d => d.Id == domainId && d.TenantId == tenantId, cancellationToken);
+
+        if (domain == null)
+        {
+            throw new KeyNotFoundException($"Domain {domainId} not found");
+        }
+
+        var dnsRecords = await _context.DomainDnsRecords
+            .Where(r => r.DomainId == domainId)
+            .ToListAsync(cancellationToken);
+
+        var response = _mapper.Map<DomainResponse>(domain);
+        response.DnsRecords = _mapper.Map<List<DnsRecordResponse>>(dnsRecords);
+
+        return response;
+    }
+
+    public async Task<IEnumerable<DomainResponse>> GetDomainsAsync(CancellationToken cancellationToken = default)
+    {
+        var tenantId = _tenantContext.GetTenantId();
+
+        var domains = await _context.Domains
+            .Where(d => d.TenantId == tenantId)
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return _mapper.Map<List<DomainResponse>>(domains);
+    }
+
+    public async Task<DomainResponse> VerifyDomainAsync(Guid domainId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = _tenantContext.GetTenantId();
+
+        var domain = await _context.Domains
+            .FirstOrDefaultAsync(d => d.Id == domainId && d.TenantId == tenantId, cancellationToken);
+
+        if (domain == null)
+        {
+            throw new KeyNotFoundException($"Domain {domainId} not found");
+        }
+
+        // Get verification status from SES
+        var sesResponse = await _sesClient.GetEmailIdentityAsync(domain.Domain, cancellationToken);
+
+        // Update domain status
+        domain.VerificationStatus = (sesResponse.VerifiedForSendingStatus ?? false) ? (byte)1 : (byte)0;
+
+        if (sesResponse.DkimAttributes?.Status != null)
+        {
+            var dkimStatus = sesResponse.DkimAttributes.Status;
+            domain.DkimStatus = dkimStatus == Amazon.SimpleEmailV2.DkimStatus.SUCCESS ? (byte)1 :
+                               dkimStatus == Amazon.SimpleEmailV2.DkimStatus.FAILED ? (byte)2 :
+                               (byte)0;
+        }
+
+        if (domain.VerificationStatus == 1 && domain.VerifiedAtUtc == null)
+        {
+            domain.VerifiedAtUtc = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Updated verification status for domain {Domain}: Verified={Verified}, DKIM={Dkim}",
+            domain.Domain, domain.VerificationStatus, domain.DkimStatus);
+
+        return await GetDomainAsync(domainId, cancellationToken);
+    }
+
+    public async Task DeleteDomainAsync(Guid domainId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = _tenantContext.GetTenantId();
+
+        var domain = await _context.Domains
+            .FirstOrDefaultAsync(d => d.Id == domainId && d.TenantId == tenantId, cancellationToken);
+
+        if (domain == null)
+        {
+            throw new KeyNotFoundException($"Domain {domainId} not found");
+        }
+
+        // Delete from SES
+        try
+        {
+            await _sesClient.DeleteEmailIdentityAsync(domain.Domain, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error deleting domain from SES, continuing with database deletion");
+        }
+
+        // Delete from database (cascades to DNS records)
+        _context.Domains.Remove(domain);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Deleted domain {Domain} for tenant {TenantId}", domain.Domain, tenantId);
+    }
+}

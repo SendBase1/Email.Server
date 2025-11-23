@@ -1,8 +1,10 @@
 using Email.Server.Data;
 using Email.Server.Models;
+using Email.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -16,12 +18,16 @@ public class AuthController(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     IConfiguration configuration,
-    ILogger<AuthController> logger) : ControllerBase
+    ILogger<AuthController> logger,
+    ITenantManagementService tenantManagementService,
+    ApplicationDbContext dbContext) : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager = userManager;
     private readonly SignInManager<ApplicationUser> _signInManager = signInManager;
     private readonly IConfiguration _configuration = configuration;
     private readonly ILogger<AuthController> _logger = logger;
+    private readonly ITenantManagementService _tenantManagementService = tenantManagementService;
+    private readonly ApplicationDbContext _dbContext = dbContext;
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest model)
@@ -38,7 +44,7 @@ public class AuthController(
         var user = new ApplicationUser
         {
             UserName = model.Email,
-            Email = model.Email
+            Email = model.Email,
         };
 
         var result = await _userManager.CreateAsync(user, model.Password);
@@ -48,13 +54,20 @@ public class AuthController(
             return BadRequest(new ErrorResponse
             {
                 Message = "User registration failed",
-                Errors = result.Errors.Select(e => e.Description).ToList()
+                Errors = [.. result.Errors.Select(e => e.Description)]
             });
         }
 
         _logger.LogInformation("User {Email} registered successfully", model.Email);
 
-        var token = await GenerateJwtToken(user);
+        // Create a default tenant for the new user
+        var tenantName = $"{model.Email}'s Organization";
+        var tenant = await _tenantManagementService.CreateTenantAsync(tenantName, user.Id);
+
+        _logger.LogInformation("Created default tenant {TenantId} for new user {UserId}", tenant.Id, user.Id);
+
+        // Generate token with the tenant ID
+        var token = await GenerateJwtToken(user, tenant.Id);
         return Ok(token);
     }
 
@@ -91,8 +104,39 @@ public class AuthController(
 
         _logger.LogInformation("User {Email} logged in successfully", model.Email);
 
-        var token = await GenerateJwtToken(user);
-        return Ok(token);
+        // Get user's tenants
+        var userTenants = await _tenantManagementService.GetTenantsByUserAsync(user.Id);
+        var tenantsList = userTenants.ToList();
+
+        if (!tenantsList.Any())
+        {
+            // If user has no tenants (edge case), create one
+            var tenantName = $"{user.Email}'s Organization";
+            var newTenant = await _tenantManagementService.CreateTenantAsync(tenantName, user.Id);
+            tenantsList.Add(newTenant);
+        }
+
+        // For now, select the first tenant. In the future, we might want to let the user choose
+        var selectedTenant = model.TenantId.HasValue
+            ? tenantsList.FirstOrDefault(t => t.Id == model.TenantId.Value) ?? tenantsList.First()
+            : tenantsList.First();
+
+        var token = await GenerateJwtToken(user, selectedTenant.Id);
+
+        // Return token with available tenants for future tenant switching
+        return Ok(new LoginResponse
+        {
+            Token = token.Token,
+            Email = token.Email,
+            UserId = token.UserId,
+            Expiration = token.Expiration,
+            TenantId = selectedTenant.Id,
+            AvailableTenants = tenantsList.Select(t => new TenantInfo
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList()
+        });
     }
 
     [Authorize]
@@ -119,15 +163,62 @@ public class AuthController(
             return NotFound();
         }
 
+        var tenantIdClaim = User.FindFirstValue("TenantId");
+        var tenantId = Guid.TryParse(tenantIdClaim, out var tid) ? tid : (Guid?)null;
+
         return Ok(new
         {
             userId = user.Id,
             email = user.Email,
-            userName = user.UserName
+            userName = user.UserName,
+            tenantId = tenantId
         });
     }
 
-    private async Task<AuthResponse> GenerateJwtToken(ApplicationUser user)
+    [Authorize]
+    [HttpPost("switch-tenant")]
+    public async Task<IActionResult> SwitchTenant([FromBody] SwitchTenantRequest request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        // Verify user has access to the requested tenant
+        var userTenants = await _tenantManagementService.GetTenantsByUserAsync(userId);
+        var selectedTenant = userTenants.FirstOrDefault(t => t.Id == request.TenantId);
+
+        if (selectedTenant == null)
+        {
+            return Forbid("You don't have access to this tenant");
+        }
+
+        // Generate new token with the selected tenant
+        var token = await GenerateJwtToken(user, request.TenantId);
+
+        return Ok(new LoginResponse
+        {
+            Token = token.Token,
+            Email = token.Email,
+            UserId = token.UserId,
+            Expiration = token.Expiration,
+            TenantId = selectedTenant.Id,
+            AvailableTenants = userTenants.Select(t => new TenantInfo
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList()
+        });
+    }
+
+    private async Task<AuthResponse> GenerateJwtToken(ApplicationUser user, Guid tenantId)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
         var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured");
@@ -137,10 +228,11 @@ public class AuthController(
 
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id),
-            new Claim(ClaimTypes.Email, user.Email!),
-            new Claim(ClaimTypes.Name, user.UserName!),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(ClaimTypes.NameIdentifier, user.Id),
+            new(ClaimTypes.Email, user.Email!),
+            new(ClaimTypes.Name, user.UserName!),
+            new("TenantId", tenantId.ToString()),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
         // Add roles to claims

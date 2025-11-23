@@ -1,102 +1,146 @@
+using Amazon.SimpleEmailV2;
 using Email.Server.Data;
+using Email.Server.Mapping;
+using Email.Server.Services.Implementations;
+using Email.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using System.Text;
 
-var builder = WebApplication.CreateBuilder(args);
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json")
+        .Build())
+    .CreateLogger();
 
-// Add services to the container.
-
-// Configure Database
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// Configure Identity
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+try
 {
-    // Password settings
-    options.Password.RequireDigit = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequiredLength = 6;
+    var builder = WebApplication.CreateBuilder(args);
 
-    // User settings
-    options.User.RequireUniqueEmail = true;
+    // Add Serilog
+    builder.Host.UseSerilog();
 
-    // Sign-in settings
-    options.SignIn.RequireConfirmedEmail = false; // Set to true if you want email confirmation
-})
-.AddEntityFrameworkStores<ApplicationDbContext>()
-.AddDefaultTokenProviders();
+    // Add services to the container.
 
-// Configure JWT Authentication
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured");
+    // Configure Database
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+    // Configure Identity
+    builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-        ClockSkew = TimeSpan.Zero
-    };
-});
+        // Password settings
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequiredLength = 6;
 
-// Configure CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
+        // User settings
+        options.User.RequireUniqueEmail = true;
+
+        // Sign-in settings
+        options.SignIn.RequireConfirmedEmail = false; // Set to true if you want email confirmation
+    })
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
+
+    // Configure JWT Authentication
+    var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+    var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured");
+
+    builder.Services.AddAuthentication(options =>
     {
-        policy.WithOrigins(
-                "https://localhost:59592",
-                "http://localhost:5173",
-                "https://polite-mud-06a30121e.3.azurestaticapps.net") // Azure Static Web App
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings["Issuer"],
+            ValidAudience = jwtSettings["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+            ClockSkew = TimeSpan.Zero
+        };
     });
-});
 
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+    // Configure CORS
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowFrontend", policy =>
+        {
+            policy.WithOrigins(
+                    "https://localhost:59592",
+                    "http://localhost:5173",
+                    "https://polite-mud-06a30121e.3.azurestaticapps.net") // Azure Static Web App
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        });
+    });
 
-var app = builder.Build();
+    // Configure AWS SES
+    builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+    builder.Services.AddAWSService<IAmazonSimpleEmailServiceV2>();
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
+    // Configure AutoMapper
+    builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    // Add HttpContextAccessor for tenant context
+    builder.Services.AddHttpContextAccessor();
+
+    // Register Services
+    builder.Services.AddScoped<ITenantContextService, TenantContextService>();
+    builder.Services.AddScoped<ITenantManagementService, TenantManagementService>();
+    builder.Services.AddScoped<ISesClientService, SesClientService>();
+    builder.Services.AddScoped<IDomainManagementService, DomainManagementService>();
+    builder.Services.AddScoped<IEmailSendingService, EmailSendingService>();
+    builder.Services.AddScoped<IMessageService, MessageService>();
+
+    builder.Services.AddControllers();
+    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+
+    var app = builder.Build();
+
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+
+    // Configure the HTTP request pipeline.
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.UseHttpsRedirection();
+
+    app.UseCors("AllowFrontend");
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.MapControllers();
+
+    app.MapFallbackToFile("/index.html");
+
+    app.Run();
 }
-
-app.UseHttpsRedirection();
-
-app.UseCors("AllowFrontend");
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.MapFallbackToFile("/index.html");
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

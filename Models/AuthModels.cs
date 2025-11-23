@@ -15,6 +15,8 @@ public class RegisterRequest
     [Required]
     [Compare(nameof(Password))]
     public string ConfirmPassword { get; set; } = string.Empty;
+
+    public string? Name { get; set; }
 }
 
 public class LoginRequest
@@ -25,6 +27,9 @@ public class LoginRequest
 
     [Required]
     public string Password { get; set; } = string.Empty;
+
+    // Optional: Allow user to specify which tenant to log into
+    public Guid? TenantId { get; set; }
 }
 
 public class AuthResponse
@@ -39,4 +44,22 @@ public class ErrorResponse
 {
     public string Message { get; set; } = string.Empty;
     public List<string>? Errors { get; set; }
+}
+
+public class LoginResponse : AuthResponse
+{
+    public Guid TenantId { get; set; }
+    public List<TenantInfo> AvailableTenants { get; set; } = new();
+}
+
+public class TenantInfo
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
+public class SwitchTenantRequest
+{
+    [Required]
+    public Guid TenantId { get; set; }
 }
