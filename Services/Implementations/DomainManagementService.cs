@@ -68,7 +68,16 @@ public class DomainManagementService : IDomainManagementService
                 _logger.LogInformation("Creating SES configuration set {ConfigSetName} for tenant {TenantId}", configSetName, tenantId);
 
                 // Create configuration set in AWS SES
-                await _sesClient.CreateConfigurationSetAsync(configSetName, cancellationToken);
+                var configSetResponse = await _sesClient.CreateConfigurationSetAsync(configSetName, cancellationToken);
+
+                // Associate configuration set to AWS SES tenant if tenant name exists
+                if (!string.IsNullOrEmpty(sesRegion.AwsSesTenantName))
+                {
+                    var configSetArn = $"arn:aws:ses:{request.Region}:{Environment.GetEnvironmentVariable("AWS_ACCOUNT_ID")}:configuration-set/{configSetName}";
+                    await _sesClient.AssociateResourceToTenantAsync(sesRegion.AwsSesTenantName, configSetArn, cancellationToken);
+                    _logger.LogInformation("Associated configuration set {ConfigSetName} to AWS SES tenant {AwsSesTenantName}",
+                        configSetName, sesRegion.AwsSesTenantName);
+                }
 
                 // Create ConfigSet entity in database
                 var configSet = new ConfigSets
@@ -89,6 +98,15 @@ public class DomainManagementService : IDomainManagementService
 
             // Create SES email identity
             var sesResponse = await _sesClient.CreateEmailIdentityAsync(request.Domain, cancellationToken);
+
+            // Associate email identity to AWS SES tenant if tenant name exists
+            if (!string.IsNullOrEmpty(sesRegion.AwsSesTenantName))
+            {
+                var identityArn = $"arn:aws:ses:{request.Region}:{Environment.GetEnvironmentVariable("AWS_ACCOUNT_ID")}:identity/{request.Domain}";
+                await _sesClient.AssociateResourceToTenantAsync(sesRegion.AwsSesTenantName, identityArn, cancellationToken);
+                _logger.LogInformation("Associated email identity {Domain} to AWS SES tenant {AwsSesTenantName}",
+                    request.Domain, sesRegion.AwsSesTenantName);
+            }
 
             // Create domain entity
             var domain = new Domains
@@ -144,6 +162,7 @@ public class DomainManagementService : IDomainManagementService
         var tenantId = _tenantContext.GetTenantId();
 
         var domain = await _context.Domains
+            .AsNoTracking()
             .Include(d => d.RegionCatalog)
             .FirstOrDefaultAsync(d => d.Id == domainId && d.TenantId == tenantId, cancellationToken);
 
@@ -153,6 +172,7 @@ public class DomainManagementService : IDomainManagementService
         }
 
         var dnsRecords = await _context.DomainDnsRecords
+            .AsNoTracking()
             .Where(r => r.DomainId == domainId)
             .ToListAsync(cancellationToken);
 

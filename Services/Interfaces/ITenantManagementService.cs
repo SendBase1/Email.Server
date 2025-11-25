@@ -12,7 +12,10 @@ namespace Email.Server.Services.Interfaces
         /// <summary>
         /// Creates a new tenant and assigns the specified user as the owner
         /// </summary>
-        Task<TenantResponse> CreateTenantAsync(string tenantName, string userId);
+        /// <param name="tenantName">Name of the tenant</param>
+        /// <param name="userId">User ID of the owner</param>
+        /// <param name="enableSending">If false, AWS SES tenant will be created with sending disabled (for unverified users)</param>
+        Task<TenantResponse> CreateTenantAsync(string tenantName, string userId, bool enableSending = true);
 
         /// <summary>
         /// Gets all tenants that a user is a member of
@@ -63,5 +66,10 @@ namespace Email.Server.Services.Interfaces
         /// Gets the user's role in a specific tenant
         /// </summary>
         Task<TenantRole?> GetUserRoleAsync(Guid tenantId, string userId);
+
+        /// <summary>
+        /// Enables sending for all tenants owned by a user (called after email verification)
+        /// </summary>
+        Task EnableSendingForUserTenantsAsync(string userId);
     }
 }

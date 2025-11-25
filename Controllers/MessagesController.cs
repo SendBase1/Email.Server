@@ -7,16 +7,10 @@ namespace Email.Server.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Authorize]
-public class MessagesController : ControllerBase
+public class MessagesController(IMessageService messageService, ILogger<MessagesController> logger) : ControllerBase
 {
-    private readonly IMessageService _messageService;
-    private readonly ILogger<MessagesController> _logger;
-
-    public MessagesController(IMessageService messageService, ILogger<MessagesController> logger)
-    {
-        _messageService = messageService;
-        _logger = logger;
-    }
+    private readonly IMessageService _messageService = messageService;
+    private readonly ILogger<MessagesController> _logger = logger;
 
     [HttpGet]
     public async Task<IActionResult> GetMessages([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default)

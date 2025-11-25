@@ -26,9 +26,12 @@ try
 
     // Add services to the container.
 
-    // Configure Database
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    {
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("DefaultConnection is not configured");
+         options.UseSqlServer(connectionString);
+    });
 
     // Configure Identity
     builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -81,6 +84,8 @@ try
             policy.WithOrigins(
                     "https://localhost:59592",
                     "http://localhost:5173",
+                    "https://localhost:59594",
+                    "https://localhost:59593",
                     "https://polite-mud-06a30121e.3.azurestaticapps.net") // Azure Static Web App
                   .AllowAnyHeader()
                   .AllowAnyMethod()
@@ -99,17 +104,22 @@ try
     builder.Services.AddHttpContextAccessor();
 
     // Register Services
+    builder.Services.AddSingleton<ISesClientFactory, SesClientFactory>();
     builder.Services.AddScoped<ITenantContextService, TenantContextService>();
     builder.Services.AddScoped<ITenantManagementService, TenantManagementService>();
     builder.Services.AddScoped<ISesClientService, SesClientService>();
     builder.Services.AddScoped<IDomainManagementService, DomainManagementService>();
     builder.Services.AddScoped<IEmailSendingService, EmailSendingService>();
+    builder.Services.AddScoped<ISystemEmailService, SystemEmailService>();
     builder.Services.AddScoped<IMessageService, MessageService>();
+
+    // Register Background Services
+    builder.Services.AddHostedService<SesProvisioningRetryService>();
 
     builder.Services.AddControllers();
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    //builder.Services.AddEndpointsApiExplorer();
+    //builder.Services.AddSwaggerGen();
 
     var app = builder.Build();
 

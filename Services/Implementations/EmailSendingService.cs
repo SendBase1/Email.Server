@@ -43,6 +43,15 @@ public class EmailSendingService : IEmailSendingService
             throw new InvalidOperationException($"Domain {fromDomain} is not verified for sending");
         }
 
+        // Get AWS SES tenant name from SesRegions
+        var sesRegion = await _context.SesRegions
+            .FirstOrDefaultAsync(sr => sr.TenantId == tenantId && sr.Region == domain.Region, cancellationToken);
+
+        if (sesRegion == null)
+        {
+            throw new InvalidOperationException($"Region {domain.Region} is not configured for tenant");
+        }
+
         // Check suppression list for all recipients
         var allRecipients = new List<string>();
         allRecipients.AddRange(request.To.Select(r => r.Email));
@@ -165,8 +174,15 @@ public class EmailSendingService : IEmailSendingService
                 var configSet = await _context.ConfigSets.FindAsync(request.ConfigSetId.Value);
                 if (configSet != null)
                 {
-                    sesRequest.ConfigurationSetName = configSet.Name;
+                    sesRequest.ConfigurationSetName = configSet.ConfigSetName;
                 }
+            }
+
+            // Add AWS SES tenant name to the request for reputation isolation
+            if (!string.IsNullOrEmpty(sesRegion.AwsSesTenantName))
+            {
+                sesRequest.TenantName = sesRegion.AwsSesTenantName;
+                _logger.LogInformation("Sending email with AWS SES tenant: {AwsSesTenantName}", sesRegion.AwsSesTenantName);
             }
 
             var sesResponse = await _sesClient.SendEmailAsync(sesRequest, cancellationToken);

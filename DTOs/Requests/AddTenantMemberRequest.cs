@@ -7,7 +7,7 @@ namespace Email.Server.DTOs.Requests
     {
         [Required]
         [EmailAddress]
-        public string UserEmail { get; set; }
+        public required string UserEmail { get; set; }
 
         [Required]
         public TenantRole Role { get; set; }

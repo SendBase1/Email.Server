@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Web;
 
 namespace Email.Server.Controllers;
 
@@ -20,6 +21,7 @@ public class AuthController(
     IConfiguration configuration,
     ILogger<AuthController> logger,
     ITenantManagementService tenantManagementService,
+    ISystemEmailService systemEmailService,
     ApplicationDbContext dbContext) : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager = userManager;
@@ -27,6 +29,7 @@ public class AuthController(
     private readonly IConfiguration _configuration = configuration;
     private readonly ILogger<AuthController> _logger = logger;
     private readonly ITenantManagementService _tenantManagementService = tenantManagementService;
+    private readonly ISystemEmailService _systemEmailService = systemEmailService;
     private readonly ApplicationDbContext _dbContext = dbContext;
 
     [HttpPost("register")]
@@ -37,7 +40,7 @@ public class AuthController(
             return BadRequest(new ErrorResponse
             {
                 Message = "Invalid input",
-                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+                Errors = [.. ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)]
             });
         }
 
@@ -45,6 +48,7 @@ public class AuthController(
         {
             UserName = model.Email,
             Email = model.Email,
+            EmailConfirmed = false
         };
 
         var result = await _userManager.CreateAsync(user, model.Password);
@@ -60,15 +64,37 @@ public class AuthController(
 
         _logger.LogInformation("User {Email} registered successfully", model.Email);
 
-        // Create a default tenant for the new user
+        // Create a default tenant for the new user with sending DISABLED until email is verified
         var tenantName = $"{model.Email}'s Organization";
-        var tenant = await _tenantManagementService.CreateTenantAsync(tenantName, user.Id);
+        var tenant = await _tenantManagementService.CreateTenantAsync(tenantName, user.Id, enableSending: false);
 
-        _logger.LogInformation("Created default tenant {TenantId} for new user {UserId}", tenant.Id, user.Id);
+        _logger.LogInformation("Created default tenant {TenantId} for new user {UserId} (sending disabled until email verified)", tenant.Id, user.Id);
+
+        // Generate email verification token and send verification email
+        try
+        {
+            var verificationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            await _systemEmailService.SendVerificationEmailAsync(user.Email!, user.Id, verificationToken);
+            _logger.LogInformation("Verification email sent to {Email}", user.Email);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send verification email to {Email}", user.Email);
+        }
 
         // Generate token with the tenant ID
         var token = await GenerateJwtToken(user, tenant.Id);
-        return Ok(token);
+
+        return Ok(new RegisterResponse
+        {
+            Token = token.Token,
+            Email = token.Email,
+            UserId = token.UserId,
+            Expiration = token.Expiration,
+            TenantId = tenant.Id,
+            EmailVerificationRequired = true,
+            Message = "Registration successful. Please check your email to verify your account and enable sending."
+        });
     }
 
     [HttpPost("login")]
@@ -79,7 +105,7 @@ public class AuthController(
             return BadRequest(new ErrorResponse
             {
                 Message = "Invalid input",
-                Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()
+                Errors = [.. ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)]
             });
         }
 
@@ -108,7 +134,7 @@ public class AuthController(
         var userTenants = await _tenantManagementService.GetTenantsByUserAsync(user.Id);
         var tenantsList = userTenants.ToList();
 
-        if (!tenantsList.Any())
+        if (tenantsList.Count == 0)
         {
             // If user has no tenants (edge case), create one
             var tenantName = $"{user.Email}'s Organization";
@@ -131,11 +157,11 @@ public class AuthController(
             UserId = token.UserId,
             Expiration = token.Expiration,
             TenantId = selectedTenant.Id,
-            AvailableTenants = tenantsList.Select(t => new TenantInfo
+            AvailableTenants = [.. tenantsList.Select(t => new TenantInfo
             {
                 Id = t.Id,
                 Name = t.Name
-            }).ToList()
+            })]
         });
     }
 
@@ -145,6 +171,77 @@ public class AuthController(
     {
         await _signInManager.SignOutAsync();
         return Ok(new { message = "Logged out successfully" });
+    }
+
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+    {
+        var user = await _userManager.FindByIdAsync(request.UserId);
+        if (user == null)
+        {
+            return BadRequest(new ErrorResponse { Message = "Invalid verification link" });
+        }
+
+        if (user.EmailConfirmed)
+        {
+            return Ok(new { message = "Email already verified" });
+        }
+
+        var result = await _userManager.ConfirmEmailAsync(user, request.Token);
+        if (!result.Succeeded)
+        {
+            return BadRequest(new ErrorResponse
+            {
+                Message = "Email verification failed",
+                Errors = [.. result.Errors.Select(e => e.Description)]
+            });
+        }
+
+        _logger.LogInformation("Email verified for user {Email}", user.Email);
+
+        // Enable sending for user's tenants now that email is verified
+        try
+        {
+            await _tenantManagementService.EnableSendingForUserTenantsAsync(user.Id);
+            _logger.LogInformation("Enabled sending for user {UserId}'s tenants after email verification", user.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enable sending for user {UserId}'s tenants", user.Id);
+            // Don't fail verification if enabling sending fails
+        }
+
+        return Ok(new { message = "Email verified successfully. You can now send emails." });
+    }
+
+    [HttpPost("resend-verification")]
+    public async Task<IActionResult> ResendVerificationEmail([FromBody] ResendVerificationRequest request)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email);
+        if (user == null)
+        {
+            // Don't reveal if user exists
+            return Ok(new { message = "If an account with that email exists and is not verified, a verification email has been sent." });
+        }
+
+        if (user.EmailConfirmed)
+        {
+            return Ok(new { message = "Email is already verified" });
+        }
+
+        try
+        {
+            var verificationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            await _systemEmailService.SendVerificationEmailAsync(user.Email!, user.Id, verificationToken);
+            _logger.LogInformation("Verification email resent to {Email}", user.Email);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to resend verification email to {Email}", user.Email);
+            return StatusCode(500, new ErrorResponse { Message = "Failed to send verification email. Please try again later." });
+        }
+
+        return Ok(new { message = "If an account with that email exists and is not verified, a verification email has been sent." });
     }
 
     [Authorize]
@@ -171,7 +268,8 @@ public class AuthController(
             userId = user.Id,
             email = user.Email,
             userName = user.UserName,
-            tenantId = tenantId
+            tenantId,
+            emailConfirmed = user.EmailConfirmed
         });
     }
 
@@ -210,11 +308,11 @@ public class AuthController(
             UserId = token.UserId,
             Expiration = token.Expiration,
             TenantId = selectedTenant.Id,
-            AvailableTenants = userTenants.Select(t => new TenantInfo
+            AvailableTenants = [.. userTenants.Select(t => new TenantInfo
             {
                 Id = t.Id,
                 Name = t.Name
-            }).ToList()
+            })]
         });
     }
 

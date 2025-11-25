@@ -4,7 +4,9 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Email.Server.Data;
 using Email.Server.DTOs.Requests;
 using Email.Server.DTOs.Responses;
 using Email.Server.Models;
@@ -15,25 +17,21 @@ namespace Email.Server.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class TenantsController : ControllerBase
+    public class TenantsController(
+        ITenantManagementService tenantManagementService,
+        ApplicationDbContext context,
+        ILogger<TenantsController> logger) : ControllerBase
     {
-        private readonly ITenantManagementService _tenantManagementService;
-        private readonly ILogger<TenantsController> _logger;
-
-        public TenantsController(ITenantManagementService tenantManagementService, ILogger<TenantsController> logger)
-        {
-            _tenantManagementService = tenantManagementService;
-            _logger = logger;
-        }
+        private readonly ITenantManagementService _tenantManagementService = tenantManagementService;
+        private readonly ApplicationDbContext _context = context;
+        private readonly ILogger<TenantsController> _logger = logger;
 
         private string GetUserId()
         {
             var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-            {
-                throw new UnauthorizedAccessException("User ID not found in token");
-            }
-            return userIdClaim.Value;
+            return userIdClaim == null
+                ? throw new UnauthorizedAccessException("User ID not found in token")
+                : userIdClaim.Value ?? throw new UnauthorizedAccessException("User ID not found in token");
         }
 
         /// <summary>
@@ -256,6 +254,73 @@ namespace Email.Server.Controllers
             {
                 _logger.LogError(ex, "Error updating role for member {MemberUserId} in tenant {TenantId}", memberUserId, id);
                 return StatusCode(500, "An error occurred while updating the member role");
+            }
+        }
+
+        /// <summary>
+        /// Get AWS SES health status for all regions of a tenant
+        /// </summary>
+        [HttpGet("{id}/ses-health")]
+        public async Task<ActionResult<TenantSesHealthResponse>> GetTenantSesHealth(Guid id)
+        {
+            try
+            {
+                var userId = GetUserId();
+
+                // Verify user has access to this tenant
+                var hasAccess = await _context.TenantMembers
+                    .AnyAsync(tm => tm.TenantId == id && tm.UserId == userId);
+
+                if (!hasAccess)
+                {
+                    return Forbid();
+                }
+
+                // Get tenant info
+                var tenant = await _context.Tenants.FindAsync(id);
+                if (tenant == null)
+                {
+                    return NotFound();
+                }
+
+                // Get all SES regions for this tenant
+                var sesRegions = await _context.SesRegions
+                    .Where(sr => sr.TenantId == id)
+                    .OrderBy(sr => sr.Region)
+                    .ToListAsync();
+
+                var regionHealthList = sesRegions.Select(sr => new SesRegionHealthResponse
+                {
+                    Id = sr.Id,
+                    Region = sr.Region,
+                    AwsSesTenantName = sr.AwsSesTenantName,
+                    AwsSesTenantId = sr.AwsSesTenantId,
+                    AwsSesTenantArn = sr.AwsSesTenantArn,
+                    SendingStatus = sr.SendingStatus,
+                    SesTenantCreatedAt = sr.SesTenantCreatedAt,
+                    ProvisioningStatus = sr.ProvisioningStatus,
+                    ProvisioningErrorMessage = sr.ProvisioningErrorMessage,
+                    LastStatusCheckUtc = sr.LastStatusCheckUtc,
+                    CreatedAtUtc = sr.CreatedAtUtc
+                }).ToList();
+
+                var response = new TenantSesHealthResponse
+                {
+                    TenantId = tenant.Id,
+                    TenantName = tenant.Name,
+                    Regions = regionHealthList,
+                    TotalRegions = sesRegions.Count,
+                    ProvisionedRegions = sesRegions.Count(sr => sr.ProvisioningStatus == ProvisioningStatus.Provisioned),
+                    FailedRegions = sesRegions.Count(sr => sr.ProvisioningStatus == ProvisioningStatus.Failed),
+                    PendingRegions = sesRegions.Count(sr => sr.ProvisioningStatus == ProvisioningStatus.Pending)
+                };
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting SES health for tenant {TenantId}", id);
+                return StatusCode(500, "An error occurred while retrieving SES health status");
             }
         }
     }

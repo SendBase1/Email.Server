@@ -140,6 +140,14 @@ namespace Email.Server.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("NEWID()");
 
+                    b.Property<string>("ConfigSetName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<bool>("IsDefault")
                         .HasColumnType("bit");
 
@@ -517,7 +525,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 11, 17, 3, 44, 45, 463, DateTimeKind.Utc).AddTicks(865),
+                            CreatedAtUtc = new DateTime(2025, 11, 24, 20, 15, 9, 6, DateTimeKind.Utc).AddTicks(5168),
                             DefaultForNewTenants = true,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -526,7 +534,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 11, 17, 3, 44, 45, 463, DateTimeKind.Utc).AddTicks(875),
+                            CreatedAtUtc = new DateTime(2025, 11, 24, 20, 15, 9, 6, DateTimeKind.Utc).AddTicks(5171),
                             DefaultForNewTenants = false,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -535,7 +543,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 11, 17, 3, 44, 45, 463, DateTimeKind.Utc).AddTicks(878),
+                            CreatedAtUtc = new DateTime(2025, 11, 24, 20, 15, 9, 6, DateTimeKind.Utc).AddTicks(5173),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -544,7 +552,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 11, 17, 3, 44, 45, 463, DateTimeKind.Utc).AddTicks(880),
+                            CreatedAtUtc = new DateTime(2025, 11, 24, 20, 15, 9, 6, DateTimeKind.Utc).AddTicks(5174),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,
@@ -590,6 +598,18 @@ namespace Email.Server.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("NEWID()");
 
+                    b.Property<string>("AwsSesTenantArn")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<string>("AwsSesTenantId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("AwsSesTenantName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -597,10 +617,27 @@ namespace Email.Server.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("nvarchar(2048)");
 
+                    b.Property<DateTime?>("LastStatusCheckUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProvisioningErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<byte>("ProvisioningStatus")
+                        .HasColumnType("tinyint");
+
                     b.Property<string>("Region")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("SendingStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("SesTenantCreatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");

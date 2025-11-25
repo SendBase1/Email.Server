@@ -49,7 +49,7 @@ public class ErrorResponse
 public class LoginResponse : AuthResponse
 {
     public Guid TenantId { get; set; }
-    public List<TenantInfo> AvailableTenants { get; set; } = new();
+    public List<TenantInfo> AvailableTenants { get; set; } = [];
 }
 
 public class TenantInfo
@@ -62,4 +62,27 @@ public class SwitchTenantRequest
 {
     [Required]
     public Guid TenantId { get; set; }
+}
+
+public class RegisterResponse : AuthResponse
+{
+    public Guid TenantId { get; set; }
+    public bool EmailVerificationRequired { get; set; }
+    public string? Message { get; set; }
+}
+
+public class VerifyEmailRequest
+{
+    [Required]
+    public string UserId { get; set; } = string.Empty;
+
+    [Required]
+    public string Token { get; set; } = string.Empty;
+}
+
+public class ResendVerificationRequest
+{
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
 }

@@ -12,12 +12,14 @@ using Email.Server.Services.Interfaces;
 
 namespace Email.Server.Services.Implementations
 {
-    public class TenantManagementService(ApplicationDbContext context, ILogger<TenantManagementService> logger) : ITenantManagementService
+    public class TenantManagementService(ApplicationDbContext context, ILogger<TenantManagementService> logger, ILoggerFactory loggerFactory, ISesClientFactory sesClientFactory) : ITenantManagementService
     {
         private readonly ApplicationDbContext _context = context;
         private readonly ILogger<TenantManagementService> _logger = logger;
+        private readonly ILoggerFactory _loggerFactory = loggerFactory;
+        private readonly ISesClientFactory _sesClientFactory = sesClientFactory;
 
-        public async Task<TenantResponse> CreateTenantAsync(string tenantName, string userId)
+        public async Task<TenantResponse> CreateTenantAsync(string tenantName, string userId, bool enableSending = true)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -51,13 +53,64 @@ namespace Email.Server.Services.Implementations
 
                 foreach (var region in defaultRegions)
                 {
-                    _context.SesRegions.Add(new SesRegions
+                    // Create AWS SES tenant name
+                    var awsSesTenantName = $"tenant-{tenant.Id}-{region.Region}";
+                    var sesRegion = new SesRegions
                     {
                         TenantId = tenant.Id,
                         Region = region.Region,
-                        //Enabled = true,
+                        AwsSesTenantName = awsSesTenantName,
+                        ProvisioningStatus = ProvisioningStatus.Pending,
                         CreatedAtUtc = DateTime.UtcNow
-                    });
+                    };
+
+                    try
+                    {
+                        // Create region-specific SES client and service
+                        var sesClient = _sesClientFactory.CreateClient(region.Region);
+                        var sesService = new SesClientService(sesClient, _loggerFactory.CreateLogger<SesClientService>());
+
+                        // Create AWS SES tenant in the specified region
+                        var response = await sesService.CreateSesTenantAsync(awsSesTenantName);
+
+                        // Capture AWS SES tenant metadata from response
+                        sesRegion.AwsSesTenantId = response.TenantId;
+                        sesRegion.AwsSesTenantArn = response.TenantArn;
+                        sesRegion.SendingStatus = response.SendingStatus?.ToString();
+                        sesRegion.SesTenantCreatedAt = response.CreatedTimestamp;
+                        sesRegion.ProvisioningStatus = ProvisioningStatus.Provisioned;
+                        sesRegion.LastStatusCheckUtc = DateTime.UtcNow;
+
+                        _logger.LogInformation("Created AWS SES tenant {AwsSesTenantName} (ID: {TenantId}, ARN: {TenantArn}) in region {Region}",
+                            awsSesTenantName, response.TenantId, response.TenantArn, region.Region);
+
+                        // If sending should be disabled (unverified user), disable it now
+                        if (!enableSending && !string.IsNullOrEmpty(response.TenantArn))
+                        {
+                            try
+                            {
+                                await sesService.UpdateTenantSendingStatusAsync(response.TenantArn, false);
+                                sesRegion.SendingStatus = "DISABLED";
+                                _logger.LogInformation("Disabled sending for AWS SES tenant {AwsSesTenantName} (user email not verified)", awsSesTenantName);
+                            }
+                            catch (Exception disableEx)
+                            {
+                                _logger.LogWarning(disableEx, "Failed to disable sending for tenant {AwsSesTenantName}, but tenant was created successfully", awsSesTenantName);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Don't throw - allow registration to succeed even if AWS SES creation fails
+                        sesRegion.ProvisioningStatus = ProvisioningStatus.Failed;
+                        sesRegion.ProvisioningErrorMessage = ex.Message;
+
+                        _logger.LogError(ex, "Failed to create AWS SES tenant {AwsSesTenantName} in region {Region}. Will retry later.",
+                            awsSesTenantName, region.Region);
+                    }
+
+                    // Store in database regardless of success/failure
+                    _context.SesRegions.Add(sesRegion);
                 }
 
                 await _context.SaveChangesAsync();
@@ -90,7 +143,7 @@ namespace Email.Server.Services.Implementations
                 .Include(tm => tm.Tenant)
                 .Select(tm => new
                 {
-                    Tenant = tm.Tenant,
+                    tm.Tenant,
                     UserRole = tm.TenantRole,
                     MemberCount = _context.TenantMembers.Count(m => m.TenantId == tm.TenantId)
                 })
@@ -98,7 +151,7 @@ namespace Email.Server.Services.Implementations
 
             return tenants.Select(t => new TenantResponse
             {
-                Id = t.Tenant.Id,
+                Id = t.Tenant!.Id,
                 Name = t.Tenant.Name,
                 Status = t.Tenant.Status,
                 CreatedAtUtc = t.Tenant.CreatedAtUtc,
@@ -111,18 +164,12 @@ namespace Email.Server.Services.Implementations
         {
             var tenantMember = await _context.TenantMembers
                 .Include(tm => tm.Tenant)
-                .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserId == userId);
-
-            if (tenantMember == null)
-            {
-                throw new UnauthorizedAccessException("User does not have access to this tenant");
-            }
-
+                .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserId == userId) ?? throw new UnauthorizedAccessException("User does not have access to this tenant");
             var memberCount = await _context.TenantMembers.CountAsync(tm => tm.TenantId == tenantId);
 
             return new TenantResponse
             {
-                Id = tenantMember.Tenant.Id,
+                Id = tenantMember.Tenant!.Id,
                 Name = tenantMember.Tenant.Name,
                 Status = tenantMember.Tenant.Status,
                 CreatedAtUtc = tenantMember.Tenant.CreatedAtUtc,
@@ -135,13 +182,8 @@ namespace Email.Server.Services.Implementations
         {
             var tenantMember = await _context.TenantMembers
                 .Include(tm => tm.Tenant)
-                .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserId == userId);
-
-            if (tenantMember == null)
-            {
-                throw new UnauthorizedAccessException("User does not have access to this tenant");
-            }
-
+                .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserId == userId) ?? throw new UnauthorizedAccessException("User does not have access to this tenant");
+            
             if (tenantMember.TenantRole != TenantRole.Owner && tenantMember.TenantRole != TenantRole.Admin)
             {
                 throw new UnauthorizedAccessException("Only owners and admins can update tenant settings");
@@ -149,12 +191,12 @@ namespace Email.Server.Services.Implementations
 
             if (!string.IsNullOrEmpty(request.Name))
             {
-                tenantMember.Tenant.Name = request.Name;
+                tenantMember.Tenant!.Name = request.Name;
             }
 
             if (request.Status.HasValue && tenantMember.TenantRole == TenantRole.Owner)
             {
-                tenantMember.Tenant.Status = request.Status.Value;
+                tenantMember.Tenant!.Status = request.Status.Value;
             }
 
             await _context.SaveChangesAsync();
@@ -163,7 +205,7 @@ namespace Email.Server.Services.Implementations
 
             return new TenantResponse
             {
-                Id = tenantMember.Tenant.Id,
+                Id = tenantMember.Tenant!.Id,
                 Name = tenantMember.Tenant.Name,
                 Status = tenantMember.Tenant.Status,
                 CreatedAtUtc = tenantMember.Tenant.CreatedAtUtc,
@@ -211,8 +253,8 @@ namespace Email.Server.Services.Implementations
                 .Select(tm => new TenantMemberResponse
                 {
                     UserId = tm.UserId,
-                    Email = tm.User.Email,
-                    Name = tm.User.UserName,
+                    Email = tm.User!.Email ?? string.Empty,
+                    Name = tm.User.UserName ?? string.Empty,
                     Role = tm.TenantRole,
                     JoinedAtUtc = tm.JoinedAtUtc
                 })
@@ -235,12 +277,7 @@ namespace Email.Server.Services.Implementations
 
             // Find user by email
             var newUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == request.UserEmail);
-
-            if (newUser == null)
-            {
-                throw new ArgumentException("User not found");
-            }
+                .FirstOrDefaultAsync(u => u.Email == request.UserEmail) ?? throw new ArgumentException("User not found");
 
             // Check if user is already a member
             var existingMember = await _context.TenantMembers
@@ -269,8 +306,8 @@ namespace Email.Server.Services.Implementations
             return new TenantMemberResponse
             {
                 UserId = newUser.Id,
-                Email = newUser.Email,
-                Name = newUser.UserName,
+                Email = newUser.Email ?? string.Empty,
+                Name = newUser.UserName ?? string.Empty,
                 Role = request.Role,
                 JoinedAtUtc = tenantMember.JoinedAtUtc
             };
@@ -339,13 +376,7 @@ namespace Email.Server.Services.Implementations
 
             var member = await _context.TenantMembers
                 .Include(tm => tm.User)
-                .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserId == memberUserId);
-
-            if (member == null)
-            {
-                throw new ArgumentException("Member not found in this tenant");
-            }
-
+                .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserId == memberUserId) ?? throw new ArgumentException("Member not found in this tenant");
             member.TenantRole = newRole;
             await _context.SaveChangesAsync();
 
@@ -355,8 +386,8 @@ namespace Email.Server.Services.Implementations
             return new TenantMemberResponse
             {
                 UserId = member.UserId,
-                Email = member.User.Email,
-                Name = member.User.UserName,
+                Email = member.User?.Email ?? string.Empty,
+                Name = member.User?.UserName ?? string.Empty,
                 Role = newRole,
                 JoinedAtUtc = member.JoinedAtUtc
             };
@@ -395,6 +426,53 @@ namespace Email.Server.Services.Implementations
                 .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserId == userId);
 
             return member?.TenantRole;
+        }
+
+        public async Task EnableSendingForUserTenantsAsync(string userId)
+        {
+            // Get all tenants where user is the owner
+            var ownedTenantIds = await _context.TenantMembers
+                .Where(tm => tm.UserId == userId && tm.TenantRole == TenantRole.Owner)
+                .Select(tm => tm.TenantId)
+                .ToListAsync();
+
+            if (ownedTenantIds.Count == 0)
+            {
+                _logger.LogWarning("No owned tenants found for user {UserId}", userId);
+                return;
+            }
+
+            // Get all SES regions for these tenants that have sending disabled
+            var sesRegions = await _context.SesRegions
+                .Where(sr => ownedTenantIds.Contains(sr.TenantId) &&
+                             sr.ProvisioningStatus == ProvisioningStatus.Provisioned &&
+                             sr.SendingStatus == "DISABLED" &&
+                             sr.AwsSesTenantArn != null)
+                .ToListAsync();
+
+            foreach (var sesRegion in sesRegions)
+            {
+                try
+                {
+                    var sesClient = _sesClientFactory.CreateClient(sesRegion.Region);
+                    var sesService = new SesClientService(sesClient, _loggerFactory.CreateLogger<SesClientService>());
+
+                    await sesService.UpdateTenantSendingStatusAsync(sesRegion.AwsSesTenantArn!, true);
+
+                    sesRegion.SendingStatus = "ENABLED";
+                    sesRegion.LastStatusCheckUtc = DateTime.UtcNow;
+
+                    _logger.LogInformation("Enabled sending for AWS SES tenant {TenantName} in region {Region} (user email verified)",
+                        sesRegion.AwsSesTenantName, sesRegion.Region);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to enable sending for tenant {TenantName} in region {Region}",
+                        sesRegion.AwsSesTenantName, sesRegion.Region);
+                }
+            }
+
+            await _context.SaveChangesAsync();
         }
     }
 }

@@ -282,6 +282,14 @@ namespace Email.Server.Migrations
                     TenantId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Region = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
                     EventBusArn = table.Column<string>(type: "nvarchar(2048)", maxLength: 2048, nullable: true),
+                    AwsSesTenantName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    AwsSesTenantId = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    AwsSesTenantArn = table.Column<string>(type: "nvarchar(2048)", maxLength: 2048, nullable: true),
+                    SendingStatus = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    SesTenantCreatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ProvisioningStatus = table.Column<byte>(type: "tinyint", nullable: false),
+                    ProvisioningErrorMessage = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    LastStatusCheckUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -450,7 +458,9 @@ namespace Email.Server.Migrations
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false, defaultValueSql: "NEWID()"),
                     SesRegionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    IsDefault = table.Column<bool>(type: "bit", nullable: false)
+                    ConfigSetName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    IsDefault = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -612,10 +622,10 @@ namespace Email.Server.Migrations
                 columns: new[] { "Region", "CreatedAtUtc", "DefaultForNewTenants", "DisplayName", "ReceiveSupported", "SendSupported" },
                 values: new object[,]
                 {
-                    { "ap-southeast-2", new DateTime(2025, 11, 17, 3, 44, 45, 463, DateTimeKind.Utc).AddTicks(880), false, "APAC (Sydney)", true, true },
-                    { "eu-west-1", new DateTime(2025, 11, 17, 3, 44, 45, 463, DateTimeKind.Utc).AddTicks(878), false, "EU (Ireland)", true, true },
-                    { "us-east-1", new DateTime(2025, 11, 17, 3, 44, 45, 463, DateTimeKind.Utc).AddTicks(865), true, "US East (N. Virginia)", true, true },
-                    { "us-west-2", new DateTime(2025, 11, 17, 3, 44, 45, 463, DateTimeKind.Utc).AddTicks(875), false, "US West (Oregon)", true, true }
+                    { "ap-southeast-2", new DateTime(2025, 11, 24, 20, 15, 9, 6, DateTimeKind.Utc).AddTicks(5174), false, "APAC (Sydney)", true, true },
+                    { "eu-west-1", new DateTime(2025, 11, 24, 20, 15, 9, 6, DateTimeKind.Utc).AddTicks(5173), false, "EU (Ireland)", true, true },
+                    { "us-east-1", new DateTime(2025, 11, 24, 20, 15, 9, 6, DateTimeKind.Utc).AddTicks(5168), true, "US East (N. Virginia)", true, true },
+                    { "us-west-2", new DateTime(2025, 11, 24, 20, 15, 9, 6, DateTimeKind.Utc).AddTicks(5171), false, "US West (Oregon)", true, true }
                 });
 
             migrationBuilder.CreateIndex(

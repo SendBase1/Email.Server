@@ -3,6 +3,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Email.Server.Models;
 
+public enum ProvisioningStatus : byte
+{
+    Pending = 0,
+    Provisioned = 1,
+    Failed = 2
+}
+
 public class SesRegions
 {
     [Key]
@@ -17,6 +24,29 @@ public class SesRegions
 
     [MaxLength(2048)]
     public string? EventBusArn { get; set; }
+
+    [MaxLength(255)]
+    public string? AwsSesTenantName { get; set; }
+
+    // AWS SES Tenant Metadata (from CreateTenantResponse)
+    [MaxLength(255)]
+    public string? AwsSesTenantId { get; set; }
+
+    [MaxLength(2048)]
+    public string? AwsSesTenantArn { get; set; }
+
+    [MaxLength(50)]
+    public string? SendingStatus { get; set; }
+
+    public DateTime? SesTenantCreatedAt { get; set; }
+
+    // Provisioning tracking
+    public ProvisioningStatus ProvisioningStatus { get; set; } = ProvisioningStatus.Pending;
+
+    [MaxLength(1000)]
+    public string? ProvisioningErrorMessage { get; set; }
+
+    public DateTime? LastStatusCheckUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
