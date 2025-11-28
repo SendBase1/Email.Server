@@ -19,9 +19,10 @@ public class SesNotificationService(
     public async Task ProcessNotificationAsync(SesNotification notification, CancellationToken cancellationToken = default)
     {
         var sesMessageId = notification.Mail.MessageId;
+        var eventType = notification.GetEventType();
 
-        _logger.LogInformation("Processing SES notification: Type={NotificationType}, SesMessageId={SesMessageId}",
-            notification.NotificationType, sesMessageId);
+        _logger.LogInformation("Processing SES notification: Type={EventType}, SesMessageId={SesMessageId}",
+            eventType, sesMessageId);
 
         // Find the message by SES message ID
         var message = await _dbContext.Messages
@@ -33,7 +34,7 @@ public class SesNotificationService(
             return;
         }
 
-        switch (notification.NotificationType.ToLowerInvariant())
+        switch (eventType.ToLowerInvariant())
         {
             case "delivery":
                 await ProcessDeliveryAsync(message, notification, cancellationToken);
@@ -44,8 +45,29 @@ public class SesNotificationService(
             case "complaint":
                 await ProcessComplaintAsync(message, notification, cancellationToken);
                 break;
+            case "open":
+                await ProcessOpenAsync(message, notification, cancellationToken);
+                break;
+            case "click":
+                await ProcessClickAsync(message, notification, cancellationToken);
+                break;
+            case "send":
+                await ProcessSendAsync(message, notification, cancellationToken);
+                break;
+            case "reject":
+                await ProcessRejectAsync(message, notification, cancellationToken);
+                break;
+            case "deliverydelay":
+                await ProcessDeliveryDelayAsync(message, notification, cancellationToken);
+                break;
+            case "renderingfailure":
+                await ProcessRenderingFailureAsync(message, notification, cancellationToken);
+                break;
+            case "subscription":
+                await ProcessSubscriptionAsync(message, notification, cancellationToken);
+                break;
             default:
-                _logger.LogWarning("Unknown notification type: {NotificationType}", notification.NotificationType);
+                _logger.LogWarning("Unknown notification type: {EventType}", eventType);
                 break;
         }
     }
@@ -215,6 +237,269 @@ public class SesNotificationService(
             // Trigger webhooks for this event
             await TriggerWebhooksAsync(messageEvent, cancellationToken);
         }
+    }
+
+    private async Task ProcessOpenAsync(Messages message, SesNotification notification, CancellationToken cancellationToken)
+    {
+        var open = notification.Open;
+        if (open == null) return;
+
+        _logger.LogInformation("Processing open for message {MessageId}, IP: {IpAddress}, UserAgent: {UserAgent}",
+            message.Id, open.IpAddress, open.UserAgent);
+
+        // Get the first recipient for this message (opens don't specify which recipient)
+        var recipient = await _dbContext.MessageRecipients
+            .FirstOrDefaultAsync(r => r.MessageId == message.Id, cancellationToken);
+
+        // Create event record
+        var messageEvent = new MessageEvents
+        {
+            MessageId = message.Id,
+            TenantId = message.TenantId,
+            Region = message.Region,
+            EventType = "Open",
+            OccurredAtUtc = open.Timestamp,
+            Recipient = recipient?.Email,
+            PayloadJson = JsonSerializer.Serialize(notification)
+        };
+        _dbContext.MessageEvents.Add(messageEvent);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Trigger webhooks for this event
+        await TriggerWebhooksAsync(messageEvent, cancellationToken);
+    }
+
+    private async Task ProcessClickAsync(Messages message, SesNotification notification, CancellationToken cancellationToken)
+    {
+        var click = notification.Click;
+        if (click == null) return;
+
+        _logger.LogInformation("Processing click for message {MessageId}, Link: {Link}, IP: {IpAddress}",
+            message.Id, click.Link, click.IpAddress);
+
+        // Get the first recipient for this message (clicks don't specify which recipient)
+        var recipient = await _dbContext.MessageRecipients
+            .FirstOrDefaultAsync(r => r.MessageId == message.Id, cancellationToken);
+
+        // Create event record
+        var messageEvent = new MessageEvents
+        {
+            MessageId = message.Id,
+            TenantId = message.TenantId,
+            Region = message.Region,
+            EventType = "Click",
+            OccurredAtUtc = click.Timestamp,
+            Recipient = recipient?.Email,
+            PayloadJson = JsonSerializer.Serialize(notification)
+        };
+        _dbContext.MessageEvents.Add(messageEvent);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Trigger webhooks for this event
+        await TriggerWebhooksAsync(messageEvent, cancellationToken);
+    }
+
+    private async Task ProcessSendAsync(Messages message, SesNotification notification, CancellationToken cancellationToken)
+    {
+        var send = notification.Send;
+
+        _logger.LogInformation("Processing send event for message {MessageId}", message.Id);
+
+        // Get the first recipient for this message
+        var recipient = await _dbContext.MessageRecipients
+            .FirstOrDefaultAsync(r => r.MessageId == message.Id, cancellationToken);
+
+        // Create event record
+        var messageEvent = new MessageEvents
+        {
+            MessageId = message.Id,
+            TenantId = message.TenantId,
+            Region = message.Region,
+            EventType = "Send",
+            OccurredAtUtc = send?.Timestamp ?? DateTime.UtcNow,
+            Recipient = recipient?.Email,
+            PayloadJson = JsonSerializer.Serialize(notification)
+        };
+        _dbContext.MessageEvents.Add(messageEvent);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Trigger webhooks for this event
+        await TriggerWebhooksAsync(messageEvent, cancellationToken);
+    }
+
+    private async Task ProcessRejectAsync(Messages message, SesNotification notification, CancellationToken cancellationToken)
+    {
+        var reject = notification.Reject;
+
+        _logger.LogWarning("Processing reject for message {MessageId}, Reason: {Reason}",
+            message.Id, reject?.Reason);
+
+        // Update all recipients to rejected status
+        var recipients = await _dbContext.MessageRecipients
+            .Where(r => r.MessageId == message.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var recipient in recipients)
+        {
+            recipient.DeliveryStatus = 4; // Rejected
+        }
+
+        // Create event record
+        var messageEvent = new MessageEvents
+        {
+            MessageId = message.Id,
+            TenantId = message.TenantId,
+            Region = message.Region,
+            EventType = "Reject",
+            OccurredAtUtc = notification.Mail.Timestamp,
+            Recipient = recipients.FirstOrDefault()?.Email,
+            PayloadJson = JsonSerializer.Serialize(notification)
+        };
+        _dbContext.MessageEvents.Add(messageEvent);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Trigger webhooks for this event
+        await TriggerWebhooksAsync(messageEvent, cancellationToken);
+    }
+
+    private async Task ProcessDeliveryDelayAsync(Messages message, SesNotification notification, CancellationToken cancellationToken)
+    {
+        var delay = notification.DeliveryDelay;
+        if (delay == null) return;
+
+        _logger.LogWarning("Processing delivery delay for message {MessageId}, DelayType: {DelayType}, ExpirationTime: {ExpirationTime}",
+            message.Id, delay.DelayType, delay.ExpirationTime);
+
+        foreach (var delayedRecipient in delay.DelayedRecipients)
+        {
+            // Update recipient delivery status to delayed
+            var recipient = await _dbContext.MessageRecipients
+                .FirstOrDefaultAsync(r => r.MessageId == message.Id &&
+                    r.Email.ToLower() == delayedRecipient.EmailAddress.ToLower(), cancellationToken);
+
+            if (recipient != null)
+            {
+                recipient.DeliveryStatus = 5; // Delayed
+                _logger.LogInformation("Updated recipient {Email} to Delayed", delayedRecipient.EmailAddress);
+            }
+
+            // Create event record
+            var messageEvent = new MessageEvents
+            {
+                MessageId = message.Id,
+                TenantId = message.TenantId,
+                Region = message.Region,
+                EventType = "DeliveryDelay",
+                OccurredAtUtc = delay.Timestamp,
+                Recipient = delayedRecipient.EmailAddress,
+                PayloadJson = JsonSerializer.Serialize(notification)
+            };
+            _dbContext.MessageEvents.Add(messageEvent);
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            // Trigger webhooks for this event
+            await TriggerWebhooksAsync(messageEvent, cancellationToken);
+        }
+    }
+
+    private async Task ProcessRenderingFailureAsync(Messages message, SesNotification notification, CancellationToken cancellationToken)
+    {
+        var failure = notification.RenderingFailure;
+
+        _logger.LogError("Processing rendering failure for message {MessageId}, Template: {TemplateName}, Error: {ErrorMessage}",
+            message.Id, failure?.TemplateName, failure?.ErrorMessage);
+
+        // Update all recipients to failed status
+        var recipients = await _dbContext.MessageRecipients
+            .Where(r => r.MessageId == message.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var recipient in recipients)
+        {
+            recipient.DeliveryStatus = 6; // RenderingFailure
+        }
+
+        // Create event record
+        var messageEvent = new MessageEvents
+        {
+            MessageId = message.Id,
+            TenantId = message.TenantId,
+            Region = message.Region,
+            EventType = "RenderingFailure",
+            OccurredAtUtc = notification.Mail.Timestamp,
+            Recipient = recipients.FirstOrDefault()?.Email,
+            PayloadJson = JsonSerializer.Serialize(notification)
+        };
+        _dbContext.MessageEvents.Add(messageEvent);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Trigger webhooks for this event
+        await TriggerWebhooksAsync(messageEvent, cancellationToken);
+    }
+
+    private async Task ProcessSubscriptionAsync(Messages message, SesNotification notification, CancellationToken cancellationToken)
+    {
+        var subscription = notification.Subscription;
+        if (subscription == null) return;
+
+        _logger.LogInformation("Processing subscription event for message {MessageId}, ContactList: {ContactList}",
+            message.Id, subscription.ContactList);
+
+        // Get the first recipient for this message
+        var recipient = await _dbContext.MessageRecipients
+            .FirstOrDefaultAsync(r => r.MessageId == message.Id, cancellationToken);
+
+        // Check if user unsubscribed
+        if (subscription.NewTopicPreferences?.UnsubscribeAll == true)
+        {
+            // Add to suppression list
+            var recipientEmail = recipient?.Email ?? notification.Mail.Destination.FirstOrDefault();
+            if (!string.IsNullOrEmpty(recipientEmail))
+            {
+                var existingSuppression = await _dbContext.Suppressions
+                    .FirstOrDefaultAsync(s => s.TenantId == message.TenantId &&
+                        s.Email.ToLower() == recipientEmail.ToLower(), cancellationToken);
+
+                if (existingSuppression == null)
+                {
+                    var suppression = new Suppressions
+                    {
+                        TenantId = message.TenantId,
+                        Region = message.Region,
+                        Email = recipientEmail.ToLower(),
+                        Reason = "unsubscribe",
+                        Source = "ses",
+                        CreatedAtUtc = DateTime.UtcNow
+                    };
+                    _dbContext.Suppressions.Add(suppression);
+                    _logger.LogInformation("Added {Email} to suppression list due to unsubscribe", recipientEmail);
+                }
+            }
+        }
+
+        // Create event record
+        var messageEvent = new MessageEvents
+        {
+            MessageId = message.Id,
+            TenantId = message.TenantId,
+            Region = message.Region,
+            EventType = "Subscription",
+            OccurredAtUtc = subscription.Timestamp,
+            Recipient = recipient?.Email,
+            PayloadJson = JsonSerializer.Serialize(notification)
+        };
+        _dbContext.MessageEvents.Add(messageEvent);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Trigger webhooks for this event
+        await TriggerWebhooksAsync(messageEvent, cancellationToken);
     }
 
     private async Task TriggerWebhooksAsync(MessageEvents messageEvent, CancellationToken cancellationToken)

@@ -46,6 +46,13 @@ public class SesNotification
     [JsonPropertyName("notificationType")]
     public string NotificationType { get; set; } = string.Empty;
 
+    // Event notifications (Open, Click, etc.) use eventType instead of notificationType
+    [JsonPropertyName("eventType")]
+    public string EventType { get; set; } = string.Empty;
+
+    // Helper to get the actual event type regardless of which field is populated
+    public string GetEventType() => !string.IsNullOrEmpty(EventType) ? EventType : NotificationType;
+
     [JsonPropertyName("mail")]
     public SesMail Mail { get; set; } = new();
 
@@ -57,6 +64,27 @@ public class SesNotification
 
     [JsonPropertyName("delivery")]
     public SesDelivery? Delivery { get; set; }
+
+    [JsonPropertyName("open")]
+    public SesOpen? Open { get; set; }
+
+    [JsonPropertyName("click")]
+    public SesClick? Click { get; set; }
+
+    [JsonPropertyName("send")]
+    public SesSend? Send { get; set; }
+
+    [JsonPropertyName("reject")]
+    public SesReject? Reject { get; set; }
+
+    [JsonPropertyName("deliveryDelay")]
+    public SesDeliveryDelay? DeliveryDelay { get; set; }
+
+    [JsonPropertyName("renderingFailure")]
+    public SesRenderingFailure? RenderingFailure { get; set; }
+
+    [JsonPropertyName("subscription")]
+    public SesSubscription? Subscription { get; set; }
 }
 
 public class SesMail
@@ -183,4 +211,118 @@ public class SesDelivery
 
     [JsonPropertyName("reportingMTA")]
     public string? ReportingMta { get; set; }
+}
+
+public class SesOpen
+{
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; }
+
+    [JsonPropertyName("userAgent")]
+    public string? UserAgent { get; set; }
+
+    [JsonPropertyName("ipAddress")]
+    public string? IpAddress { get; set; }
+}
+
+public class SesClick
+{
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; }
+
+    [JsonPropertyName("userAgent")]
+    public string? UserAgent { get; set; }
+
+    [JsonPropertyName("ipAddress")]
+    public string? IpAddress { get; set; }
+
+    [JsonPropertyName("link")]
+    public string? Link { get; set; }
+
+    [JsonPropertyName("linkTags")]
+    public Dictionary<string, List<string>>? LinkTags { get; set; }
+}
+
+public class SesSend
+{
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; }
+}
+
+public class SesReject
+{
+    [JsonPropertyName("reason")]
+    public string Reason { get; set; } = string.Empty;
+}
+
+public class SesDeliveryDelay
+{
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; }
+
+    [JsonPropertyName("delayType")]
+    public string DelayType { get; set; } = string.Empty;
+
+    [JsonPropertyName("expirationTime")]
+    public DateTime? ExpirationTime { get; set; }
+
+    [JsonPropertyName("delayedRecipients")]
+    public List<SesDelayedRecipient> DelayedRecipients { get; set; } = new();
+}
+
+public class SesDelayedRecipient
+{
+    [JsonPropertyName("emailAddress")]
+    public string EmailAddress { get; set; } = string.Empty;
+
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    [JsonPropertyName("diagnosticCode")]
+    public string? DiagnosticCode { get; set; }
+}
+
+public class SesRenderingFailure
+{
+    [JsonPropertyName("templateName")]
+    public string? TemplateName { get; set; }
+
+    [JsonPropertyName("errorMessage")]
+    public string? ErrorMessage { get; set; }
+}
+
+public class SesSubscription
+{
+    [JsonPropertyName("contactList")]
+    public string? ContactList { get; set; }
+
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; }
+
+    [JsonPropertyName("source")]
+    public string? Source { get; set; }
+
+    [JsonPropertyName("newTopicPreferences")]
+    public SesTopicPreferences? NewTopicPreferences { get; set; }
+
+    [JsonPropertyName("oldTopicPreferences")]
+    public SesTopicPreferences? OldTopicPreferences { get; set; }
+}
+
+public class SesTopicPreferences
+{
+    [JsonPropertyName("unsubscribeAll")]
+    public bool UnsubscribeAll { get; set; }
+
+    [JsonPropertyName("topicSubscriptionStatus")]
+    public List<SesTopicSubscriptionStatus>? TopicSubscriptionStatus { get; set; }
+}
+
+public class SesTopicSubscriptionStatus
+{
+    [JsonPropertyName("topicName")]
+    public string TopicName { get; set; } = string.Empty;
+
+    [JsonPropertyName("subscriptionStatus")]
+    public string SubscriptionStatus { get; set; } = string.Empty;
 }
