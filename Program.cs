@@ -109,6 +109,7 @@ try
                     "http://localhost:5173",
                     "https://localhost:59594",
                     "https://localhost:59593",
+                    "https://www.socialhq.app",
                     "https://polite-mud-06a30121e.3.azurestaticapps.net") // Azure Static Web App
                   .AllowAnyHeader()
                   .AllowAnyMethod()
@@ -119,7 +120,8 @@ try
     // Configure AutoMapper
     builder.Services.AddAutoMapper(cfg =>
     {
-        cfg.LicenseKey = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ikx1Y2t5UGVubnlTb2Z0d2FyZUxpY2Vuc2VLZXkvYmJiMTNhY2I1OTkwNGQ4OWI0Y2IxYzg1ZjA4OGNjZjkiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2x1Y2t5cGVubnlzb2Z0d2FyZS5jb20iLCJhdWQiOiJMdWNreVBlbm55U29mdHdhcmUiLCJleHAiOiIxNzk1NjUxMjAwIiwiaWF0IjoiMTc2NDE4NTc0OSIsImFjY291bnRfaWQiOiIwMTlhYzFhOTg1MjM3YmFmYWE1YjM5ZGQ2MTFlZjVmNCIsImN1c3RvbWVyX2lkIjoiY3RtXzAxa2IwdG1lNm1rNDYxdDRuZXNlYzhuODZoIiwic3ViX2lkIjoiLSIsImVkaXRpb24iOiIwIiwidHlwZSI6IjIifQ.n0I9BbgcgWWokf5JSvqOocYSx92ls7BhS5kf5HOfCFbu2YMVjoscakiI1NNARIJPgozFgdfDNSs5uXj9DNSE4tTrBmkatRQ7rnj4OtAZehuwAdUefvK8S-MVh61XIxDr6cMkSNqTVj3iilMyeeoVhkHYYMSVKkc5ArI88YhIWWY-ZWmDReYECwG9k9GPTu418zxLc5NHqoXfRGpxIm67MWNmEy425Ru0Q4VcFYZQPUjN7setwVVRLPBh3uxsDVzPY5ErWa9OayOPsQ7AFzGpTnedbN0unfZ_89b-13hg4moTay3gTyIv3JnJl6g6xtOifffRdXavo_hw_OOpi4LCRg";
+        //cfg.LicenseKey = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ikx1Y2t5UGVubnlTb2Z0d2FyZUxpY2Vuc2VLZXkvYmJiMTNhY2I1OTkwNGQ4OWI0Y2IxYzg1ZjA4OGNjZjkiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2x1Y2t5cGVubnlzb2Z0d2FyZS5jb20iLCJhdWQiOiJMdWNreVBlbm55U29mdHdhcmUiLCJleHAiOiIxNzk1NjUxMjAwIiwiaWF0IjoiMTc2NDE4NTc0OSIsImFjY291bnRfaWQiOiIwMTlhYzFhOTg1MjM3YmFmYWE1YjM5ZGQ2MTFlZjVmNCIsImN1c3RvbWVyX2lkIjoiY3RtXzAxa2IwdG1lNm1rNDYxdDRuZXNlYzhuODZoIiwic3ViX2lkIjoiLSIsImVkaXRpb24iOiIwIiwidHlwZSI6IjIifQ.n0I9BbgcgWWokf5JSvqOocYSx92ls7BhS5kf5HOfCFbu2YMVjoscakiI1NNARIJPgozFgdfDNSs5uXj9DNSE4tTrBmkatRQ7rnj4OtAZehuwAdUefvK8S-MVh61XIxDr6cMkSNqTVj3iilMyeeoVhkHYYMSVKkc5ArI88YhIWWY-ZWmDReYECwG9k9GPTu418zxLc5NHqoXfRGpxIm67MWNmEy425Ru0Q4VcFYZQPUjN7setwVVRLPBh3uxsDVzPY5ErWa9OayOPsQ7AFzGpTnedbN0unfZ_89b-13hg4moTay3gTyIv3JnJl6g6xtOifffRdXavo_hw_OOpi4LCRg";
+        cfg.LicenseKey = builder.Configuration["AutoMapper:LicenseKey"];
         cfg.AddProfile<AutoMapperProfile>();
     });
 
