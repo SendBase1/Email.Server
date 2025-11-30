@@ -4,6 +4,7 @@ using Email.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Email.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251130210913_AddStripePaymentLinkUrl")]
+    partial class AddStripePaymentLinkUrl
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -177,6 +180,9 @@ namespace Email.Server.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsTrial")
+                        .HasColumnType("bit");
+
                     b.Property<int>("MaxApiKeys")
                         .HasColumnType("int");
 
@@ -227,6 +233,9 @@ namespace Email.Server.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("TrialDays")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -254,6 +263,7 @@ namespace Email.Server.Migrations
                             HasDedicatedIp = false,
                             IncludedEmails = 25000,
                             IsActive = true,
+                            IsTrial = false,
                             MaxApiKeys = 2,
                             MaxDomains = 1,
                             MaxTeamMembers = 1,
@@ -266,6 +276,7 @@ namespace Email.Server.Migrations
                             StripePriceId = "price_starter",
                             StripeProductId = "prod_starter",
                             SupportLevel = "Email",
+                            TrialDays = 0,
                             UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -279,6 +290,7 @@ namespace Email.Server.Migrations
                             HasDedicatedIp = false,
                             IncludedEmails = 100000,
                             IsActive = true,
+                            IsTrial = false,
                             MaxApiKeys = 10,
                             MaxDomains = 5,
                             MaxTeamMembers = 5,
@@ -291,6 +303,7 @@ namespace Email.Server.Migrations
                             StripePriceId = "price_growth",
                             StripeProductId = "prod_growth",
                             SupportLevel = "Priority",
+                            TrialDays = 0,
                             UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -304,6 +317,7 @@ namespace Email.Server.Migrations
                             HasDedicatedIp = true,
                             IncludedEmails = 500000,
                             IsActive = true,
+                            IsTrial = false,
                             MaxApiKeys = 50,
                             MaxDomains = 999,
                             MaxTeamMembers = 20,
@@ -316,6 +330,7 @@ namespace Email.Server.Migrations
                             StripePriceId = "price_enterprise",
                             StripeProductId = "prod_enterprise",
                             SupportLevel = "24/7",
+                            TrialDays = 0,
                             UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
@@ -798,7 +813,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 11, 30, 22, 52, 9, 972, DateTimeKind.Utc).AddTicks(8989),
+                            CreatedAtUtc = new DateTime(2025, 11, 30, 21, 9, 10, 914, DateTimeKind.Utc).AddTicks(3120),
                             DefaultForNewTenants = false,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -807,7 +822,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 11, 30, 22, 52, 9, 973, DateTimeKind.Utc).AddTicks(2929),
+                            CreatedAtUtc = new DateTime(2025, 11, 30, 21, 9, 10, 914, DateTimeKind.Utc).AddTicks(9838),
                             DefaultForNewTenants = true,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -816,7 +831,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 11, 30, 22, 52, 9, 973, DateTimeKind.Utc).AddTicks(2948),
+                            CreatedAtUtc = new DateTime(2025, 11, 30, 21, 9, 10, 914, DateTimeKind.Utc).AddTicks(9847),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -825,7 +840,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 11, 30, 22, 52, 9, 973, DateTimeKind.Utc).AddTicks(2965),
+                            CreatedAtUtc = new DateTime(2025, 11, 30, 21, 9, 10, 914, DateTimeKind.Utc).AddTicks(9851),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,

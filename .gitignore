@@ -289,4 +289,4 @@ __pycache__/
 *.xsd.cs
 .claude/settings.local.json
 nul
-/appsettings.json
+appsettings*.json

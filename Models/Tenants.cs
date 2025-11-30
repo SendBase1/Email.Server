@@ -21,5 +21,17 @@ namespace Email.Server.Models
         public TenantStatus Status { get; set; } = TenantStatus.Active;
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+        // Billing fields
+        public bool IsBillingEnabled { get; set; } = false;
+
+        public bool IsInGracePeriod { get; set; } = false;
+
+        public DateTime? GracePeriodEndsAt { get; set; }
+
+        public DateTime? SendingDisabledAt { get; set; }
+
+        [MaxLength(500)]
+        public string? SendingDisabledReason { get; set; }
     }
 }

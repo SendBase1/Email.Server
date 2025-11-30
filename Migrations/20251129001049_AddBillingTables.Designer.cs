@@ -4,6 +4,7 @@ using Email.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Email.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251129001049_AddBillingTables")]
+    partial class AddBillingTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -164,17 +167,13 @@ namespace Email.Server.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<bool>("HasDedicatedIp")
-                        .HasColumnType("bit");
-
                     b.Property<int>("IncludedEmails")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsTrial")
                         .HasColumnType("bit");
 
                     b.Property<int>("MaxApiKeys")
@@ -210,10 +209,6 @@ namespace Email.Server.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("StripePaymentLinkUrl")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<string>("StripePriceId")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -223,9 +218,8 @@ namespace Email.Server.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("SupportLevel")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<int?>("TrialDays")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
@@ -241,83 +235,6 @@ namespace Email.Server.Migrations
                         .HasDatabaseName("UQ_BillingPlans_StripePriceId");
 
                     b.ToTable("BillingPlans", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000001"),
-                            AllowsOverage = true,
-                            AnalyticsRetentionDays = 7,
-                            CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Perfect for small projects and startups",
-                            DisplayName = "Starter",
-                            HasDedicatedIp = false,
-                            IncludedEmails = 25000,
-                            IsActive = true,
-                            MaxApiKeys = 2,
-                            MaxDomains = 1,
-                            MaxTeamMembers = 1,
-                            MaxTemplates = 10,
-                            MaxWebhooks = 2,
-                            MonthlyPriceCents = 900,
-                            Name = "starter",
-                            OverageRateCentsPer1K = 40,
-                            SortOrder = 1,
-                            StripePriceId = "price_starter",
-                            StripeProductId = "prod_starter",
-                            SupportLevel = "Email",
-                            UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000002"),
-                            AllowsOverage = true,
-                            AnalyticsRetentionDays = 30,
-                            CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "For growing businesses with higher volume",
-                            DisplayName = "Growth",
-                            HasDedicatedIp = false,
-                            IncludedEmails = 100000,
-                            IsActive = true,
-                            MaxApiKeys = 10,
-                            MaxDomains = 5,
-                            MaxTeamMembers = 5,
-                            MaxTemplates = 50,
-                            MaxWebhooks = 5,
-                            MonthlyPriceCents = 2900,
-                            Name = "growth",
-                            OverageRateCentsPer1K = 30,
-                            SortOrder = 2,
-                            StripePriceId = "price_growth",
-                            StripeProductId = "prod_growth",
-                            SupportLevel = "Priority",
-                            UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000003"),
-                            AllowsOverage = true,
-                            AnalyticsRetentionDays = 90,
-                            CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "For large organizations with custom needs",
-                            DisplayName = "Enterprise",
-                            HasDedicatedIp = true,
-                            IncludedEmails = 500000,
-                            IsActive = true,
-                            MaxApiKeys = 50,
-                            MaxDomains = 999,
-                            MaxTeamMembers = 20,
-                            MaxTemplates = 200,
-                            MaxWebhooks = 20,
-                            MonthlyPriceCents = 9900,
-                            Name = "enterprise",
-                            OverageRateCentsPer1K = 20,
-                            SortOrder = 3,
-                            StripePriceId = "price_enterprise",
-                            StripeProductId = "prod_enterprise",
-                            SupportLevel = "24/7",
-                            UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
                 });
 
             modelBuilder.Entity("Email.Server.Models.ConfigSets", b =>
@@ -798,7 +715,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 11, 30, 22, 52, 9, 972, DateTimeKind.Utc).AddTicks(8989),
+                            CreatedAtUtc = new DateTime(2025, 11, 29, 0, 10, 46, 535, DateTimeKind.Utc).AddTicks(5717),
                             DefaultForNewTenants = false,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -807,7 +724,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 11, 30, 22, 52, 9, 973, DateTimeKind.Utc).AddTicks(2929),
+                            CreatedAtUtc = new DateTime(2025, 11, 29, 0, 10, 46, 535, DateTimeKind.Utc).AddTicks(8146),
                             DefaultForNewTenants = true,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -816,7 +733,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 11, 30, 22, 52, 9, 973, DateTimeKind.Utc).AddTicks(2948),
+                            CreatedAtUtc = new DateTime(2025, 11, 29, 0, 10, 46, 535, DateTimeKind.Utc).AddTicks(8148),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -825,7 +742,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 11, 30, 22, 52, 9, 973, DateTimeKind.Utc).AddTicks(2965),
+                            CreatedAtUtc = new DateTime(2025, 11, 29, 0, 10, 46, 535, DateTimeKind.Utc).AddTicks(8150),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,
@@ -1263,7 +1180,7 @@ namespace Email.Server.Migrations
                     b.Property<DateTime>("PeriodStart")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("SubscriptionId")
+                    b.Property<Guid>("SubscriptionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("TenantId")
@@ -1770,7 +1687,8 @@ namespace Email.Server.Migrations
                     b.HasOne("Email.Server.Models.TenantSubscriptions", "Subscription")
                         .WithMany()
                         .HasForeignKey("SubscriptionId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Email.Server.Models.Tenants", "Tenant")
                         .WithMany()

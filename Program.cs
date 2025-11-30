@@ -1,7 +1,9 @@
 using Email.Server.Authentication;
+using Email.Server.Configuration;
 using Email.Server.Data;
 using Email.Server.DTOs.Requests;
 using Email.Server.Mapping;
+using Email.Server.Services.Background;
 using Email.Server.Services.Implementations;
 using Email.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -128,6 +130,10 @@ try
     // Add HttpContextAccessor for tenant context
     builder.Services.AddHttpContextAccessor();
 
+    // Configure Billing Settings
+    builder.Services.Configure<StripeSettings>(builder.Configuration.GetSection(StripeSettings.SectionName));
+    builder.Services.Configure<BillingSettings>(builder.Configuration.GetSection(BillingSettings.SectionName));
+
     // Register Services
     builder.Services.AddSingleton<ISesClientFactory, SesClientFactory>();
     builder.Services.AddScoped<ITenantContextService, TenantContextService>();
@@ -141,6 +147,12 @@ try
     builder.Services.AddScoped<IWebhookDeliveryService, WebhookDeliveryService>();
     builder.Services.AddScoped<ISesNotificationService, SesNotificationService>();
 
+    // Billing Services
+    builder.Services.AddScoped<IBillingService, BillingService>();
+    builder.Services.AddScoped<IUsageTrackingService, UsageTrackingService>();
+    builder.Services.AddScoped<IStripeWebhookService, StripeWebhookService>();
+    builder.Services.AddScoped<ISubscriptionEnforcementService, SubscriptionEnforcementService>();
+
     // Add HttpClientFactory for webhook confirmations and deliveries
     builder.Services.AddHttpClient();
     builder.Services.AddHttpClient("WebhookClient", client =>
@@ -151,7 +163,9 @@ try
     // Register Background Services
     builder.Services.AddHostedService<SesProvisioningRetryService>();
     builder.Services.AddHostedService<ScheduledEmailService>();
-    builder.Services.AddHostedService<Email.Server.Services.Background.WebhookDeliveryBackgroundService>();
+    builder.Services.AddHostedService<WebhookDeliveryBackgroundService>();
+    builder.Services.AddHostedService<UsageReportingBackgroundService>();
+    builder.Services.AddHostedService<GracePeriodEnforcementBackgroundService>();
 
     builder.Services.AddControllers();
     var app = builder.Build();

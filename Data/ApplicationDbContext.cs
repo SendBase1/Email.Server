@@ -48,6 +48,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     // Inbound
     public DbSet<InboundMessages> InboundMessages { get; set; }
 
+    // Billing
+    public DbSet<BillingPlans> BillingPlans { get; set; }
+    public DbSet<TenantSubscriptions> TenantSubscriptions { get; set; }
+    public DbSet<UsagePeriods> UsagePeriods { get; set; }
+    public DbSet<StripeCustomers> StripeCustomers { get; set; }
+    public DbSet<StripeWebhookEvents> StripeWebhookEvents { get; set; }
+    public DbSet<Invoices> Invoices { get; set; }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -334,6 +342,168 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .WithMany()
                 .HasForeignKey(i => i.Region)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // BillingPlans
+        builder.Entity<BillingPlans>(entity =>
+        {
+            entity.ToTable("BillingPlans");
+            entity.Property(b => b.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.HasIndex(b => b.Name).IsUnique().HasDatabaseName("UQ_BillingPlans_Name");
+            entity.HasIndex(b => b.StripePriceId).IsUnique().HasDatabaseName("UQ_BillingPlans_StripePriceId");
+
+            // Seed billing plans
+            entity.HasData(
+                new BillingPlans
+                {
+                    Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
+                    Name = "starter",
+                    DisplayName = "Starter",
+                    Description = "Perfect for small projects and startups",
+                    StripePriceId = "price_starter",
+                    StripeProductId = "prod_starter",
+                    MonthlyPriceCents = 900,
+                    IncludedEmails = 25000,
+                    OverageRateCentsPer1K = 40,
+                    MaxDomains = 1,
+                    MaxApiKeys = 2,
+                    MaxWebhooks = 2,
+                    MaxTeamMembers = 1,
+                    MaxTemplates = 10,
+                    AnalyticsRetentionDays = 7,
+                    HasDedicatedIp = false,
+                    SupportLevel = "Email",
+                    AllowsOverage = true,
+                    SortOrder = 1,
+                    IsActive = true,
+                    CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new BillingPlans
+                {
+                    Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
+                    Name = "growth",
+                    DisplayName = "Growth",
+                    Description = "For growing businesses with higher volume",
+                    StripePriceId = "price_growth",
+                    StripeProductId = "prod_growth",
+                    MonthlyPriceCents = 2900,
+                    IncludedEmails = 100000,
+                    OverageRateCentsPer1K = 30,
+                    MaxDomains = 5,
+                    MaxApiKeys = 10,
+                    MaxWebhooks = 5,
+                    MaxTeamMembers = 5,
+                    MaxTemplates = 50,
+                    AnalyticsRetentionDays = 30,
+                    HasDedicatedIp = false,
+                    SupportLevel = "Priority",
+                    AllowsOverage = true,
+                    SortOrder = 2,
+                    IsActive = true,
+                    CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new BillingPlans
+                {
+                    Id = Guid.Parse("00000000-0000-0000-0000-000000000003"),
+                    Name = "enterprise",
+                    DisplayName = "Enterprise",
+                    Description = "For large organizations with custom needs",
+                    StripePriceId = "price_enterprise",
+                    StripeProductId = "prod_enterprise",
+                    MonthlyPriceCents = 9900,
+                    IncludedEmails = 500000,
+                    OverageRateCentsPer1K = 20,
+                    MaxDomains = 999,
+                    MaxApiKeys = 50,
+                    MaxWebhooks = 20,
+                    MaxTeamMembers = 20,
+                    MaxTemplates = 200,
+                    AnalyticsRetentionDays = 90,
+                    HasDedicatedIp = true,
+                    SupportLevel = "24/7",
+                    AllowsOverage = true,
+                    SortOrder = 3,
+                    IsActive = true,
+                    CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                }
+            );
+        });
+
+        // TenantSubscriptions
+        builder.Entity<TenantSubscriptions>(entity =>
+        {
+            entity.ToTable("TenantSubscriptions");
+            entity.Property(ts => ts.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.HasIndex(ts => ts.TenantId).HasDatabaseName("IX_TenantSubscriptions_Tenant");
+            entity.HasIndex(ts => ts.StripeSubscriptionId).IsUnique().HasDatabaseName("UQ_TenantSubscriptions_StripeId");
+
+            entity.HasOne(ts => ts.Tenant)
+                .WithMany()
+                .HasForeignKey(ts => ts.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(ts => ts.BillingPlan)
+                .WithMany()
+                .HasForeignKey(ts => ts.BillingPlanId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // UsagePeriods
+        builder.Entity<UsagePeriods>(entity =>
+        {
+            entity.ToTable("UsagePeriods");
+            entity.Property(up => up.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.HasIndex(up => new { up.TenantId, up.PeriodStart }).HasDatabaseName("IX_UsagePeriods_Tenant_Period");
+            entity.HasIndex(up => up.SubscriptionId).HasDatabaseName("IX_UsagePeriods_Subscription");
+
+            entity.HasOne(up => up.Tenant)
+                .WithMany()
+                .HasForeignKey(up => up.TenantId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(up => up.Subscription)
+                .WithMany()
+                .HasForeignKey(up => up.SubscriptionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // StripeCustomers
+        builder.Entity<StripeCustomers>(entity =>
+        {
+            entity.ToTable("StripeCustomers");
+            entity.Property(sc => sc.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.HasIndex(sc => sc.TenantId).IsUnique().HasDatabaseName("UQ_StripeCustomers_Tenant");
+            entity.HasIndex(sc => sc.StripeCustomerId).IsUnique().HasDatabaseName("UQ_StripeCustomers_StripeId");
+
+            entity.HasOne(sc => sc.Tenant)
+                .WithMany()
+                .HasForeignKey(sc => sc.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // StripeWebhookEvents
+        builder.Entity<StripeWebhookEvents>(entity =>
+        {
+            entity.ToTable("StripeWebhookEvents");
+            entity.HasIndex(sw => sw.ReceivedAtUtc).HasDatabaseName("IX_StripeWebhookEvents_Received");
+            entity.HasIndex(sw => new { sw.Processed, sw.ReceivedAtUtc }).HasDatabaseName("IX_StripeWebhookEvents_Pending");
+        });
+
+        // Invoices
+        builder.Entity<Invoices>(entity =>
+        {
+            entity.ToTable("Invoices");
+            entity.Property(i => i.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.HasIndex(i => i.TenantId).HasDatabaseName("IX_Invoices_Tenant");
+            entity.HasIndex(i => i.StripeInvoiceId).IsUnique().HasDatabaseName("UQ_Invoices_StripeId");
+
+            entity.HasOne(i => i.Tenant)
+                .WithMany()
+                .HasForeignKey(i => i.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
