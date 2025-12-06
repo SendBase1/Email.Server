@@ -44,9 +44,16 @@ try
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
-            var instance = azureAdConfig["Instance"]?.TrimEnd('/');
+            var instance = azureAdConfig["Instance"]?.TrimEnd('/') ?? "";
             var tenantId = azureAdConfig["TenantId"];
             var clientId = azureAdConfig["ClientId"];
+
+            // Ensure instance has https:// scheme
+            if (!instance.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                !instance.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                instance = $"https://{instance}";
+            }
 
             // For CIAM (External ID), use the ciamlogin.com authority
             // The metadata endpoint will provide the correct issuer
