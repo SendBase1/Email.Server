@@ -56,16 +56,21 @@ try
             }
 
             // For CIAM (External ID), use the ciamlogin.com authority
-            // The metadata endpoint will provide the correct issuer
             options.Authority = $"{instance}/{tenantId}/v2.0";
             options.Audience = clientId;
 
-            // Let the middleware auto-discover the issuer from OIDC metadata
-            // This ensures we use the exact issuer that's in the token
+            // For CIAM, explicitly set valid issuers since metadata discovery may not work
+            // CIAM uses format: https://{tenantId}.ciamlogin.com/{tenantId}/v2.0
             options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
             {
                 ValidateIssuer = true,
-                // Don't set ValidIssuer - let it be discovered from the authority metadata
+                ValidIssuers = new[]
+                {
+                    $"https://{tenantId}.ciamlogin.com/{tenantId}/v2.0",
+                    $"{instance}/{tenantId}/v2.0",
+                    $"https://login.microsoftonline.com/{tenantId}/v2.0",
+                    $"https://sts.windows.net/{tenantId}/",
+                },
                 ValidateAudience = true,
                 ValidAudience = clientId,
                 ValidateLifetime = true,
