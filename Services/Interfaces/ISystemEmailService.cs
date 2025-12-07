@@ -15,4 +15,14 @@ public interface ISystemEmailService
     /// Sends a password reset link to the user
     /// </summary>
     Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a team invitation email to invite a user to join a team
+    /// </summary>
+    Task SendTeamInvitationEmailAsync(string toEmail, string teamName, string tenantName, string inviterName, string invitationToken, string? personalMessage = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a contact form submission to the support team
+    /// </summary>
+    Task SendContactFormEmailAsync(string fromEmail, string message, CancellationToken cancellationToken = default);
 }

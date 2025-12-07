@@ -4,6 +4,7 @@ using Email.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Email.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251207024322_AddTenantInvitations")]
+    partial class AddTenantInvitations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -288,66 +291,6 @@ namespace Email.Server.Migrations
                         .HasDatabaseName("UQ_ConfigSets_Scope");
 
                     b.ToTable("ConfigSets", (string)null);
-                });
-
-            modelBuilder.Entity("Email.Server.Models.ContactSubmissions", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(45)
-                        .HasColumnType("nvarchar(45)");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(5000)
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTime?>("ReadAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("RepliedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("UserAgent")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAtUtc")
-                        .HasDatabaseName("IX_ContactSubmissions_Created");
-
-                    b.HasIndex("Email")
-                        .HasDatabaseName("IX_ContactSubmissions_Email");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("IX_ContactSubmissions_Status");
-
-                    b.ToTable("ContactSubmissions", (string)null);
                 });
 
             modelBuilder.Entity("Email.Server.Models.DomainDnsRecords", b =>
@@ -793,7 +736,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 428, DateTimeKind.Utc).AddTicks(7550),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 2, 43, 20, 912, DateTimeKind.Utc).AddTicks(5366),
                             DefaultForNewTenants = false,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -802,7 +745,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(183),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 2, 43, 20, 912, DateTimeKind.Utc).AddTicks(8286),
                             DefaultForNewTenants = true,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -811,7 +754,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(187),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 2, 43, 20, 912, DateTimeKind.Utc).AddTicks(8291),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -820,7 +763,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(188),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 2, 43, 20, 912, DateTimeKind.Utc).AddTicks(8293),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,

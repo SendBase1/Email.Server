@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using Email.Server.Authentication;
 using Email.Server.Configuration;
 using Email.Server.Data;
@@ -8,6 +9,7 @@ using Email.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -64,13 +66,13 @@ try
             options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
             {
                 ValidateIssuer = true,
-                ValidIssuers = new[]
-                {
+                ValidIssuers =
+                [
                     $"https://{tenantId}.ciamlogin.com/{tenantId}/v2.0",
                     $"{instance}/{tenantId}/v2.0",
                     $"https://login.microsoftonline.com/{tenantId}/v2.0",
                     $"https://sts.windows.net/{tenantId}/",
-                },
+                ],
                 ValidateAudience = true,
                 ValidAudience = clientId,
                 ValidateLifetime = true,
@@ -131,8 +133,7 @@ try
         options.AddPolicy("AllowFrontend", policy =>
         {
             policy.WithOrigins(
-                    "https://localhost:" +
-                    "59592",
+                    "https://localhost:59592",
                     "http://localhost:5173",
                     "https://localhost:59594",
                     "https://localhost:59593",
@@ -147,7 +148,6 @@ try
     // Configure AutoMapper
     builder.Services.AddAutoMapper(cfg =>
     {
-        //cfg.LicenseKey = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ikx1Y2t5UGVubnlTb2Z0d2FyZUxpY2Vuc2VLZXkvYmJiMTNhY2I1OTkwNGQ4OWI0Y2IxYzg1ZjA4OGNjZjkiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2x1Y2t5cGVubnlzb2Z0d2FyZS5jb20iLCJhdWQiOiJMdWNreVBlbm55U29mdHdhcmUiLCJleHAiOiIxNzk1NjUxMjAwIiwiaWF0IjoiMTc2NDE4NTc0OSIsImFjY291bnRfaWQiOiIwMTlhYzFhOTg1MjM3YmFmYWE1YjM5ZGQ2MTFlZjVmNCIsImN1c3RvbWVyX2lkIjoiY3RtXzAxa2IwdG1lNm1rNDYxdDRuZXNlYzhuODZoIiwic3ViX2lkIjoiLSIsImVkaXRpb24iOiIwIiwidHlwZSI6IjIifQ.n0I9BbgcgWWokf5JSvqOocYSx92ls7BhS5kf5HOfCFbu2YMVjoscakiI1NNARIJPgozFgdfDNSs5uXj9DNSE4tTrBmkatRQ7rnj4OtAZehuwAdUefvK8S-MVh61XIxDr6cMkSNqTVj3iilMyeeoVhkHYYMSVKkc5ArI88YhIWWY-ZWmDReYECwG9k9GPTu418zxLc5NHqoXfRGpxIm67MWNmEy425Ru0Q4VcFYZQPUjN7setwVVRLPBh3uxsDVzPY5ErWa9OayOPsQ7AFzGpTnedbN0unfZ_89b-13hg4moTay3gTyIv3JnJl6g6xtOifffRdXavo_hw_OOpi4LCRg";
         cfg.LicenseKey = builder.Configuration["AutoMapper:LicenseKey"];
         cfg.AddProfile<AutoMapperProfile>();
     });
@@ -185,7 +185,25 @@ try
         client.DefaultRequestHeaders.Add("Accept", "application/json");
     });
 
-    builder.Services.AddControllers();
+    // Add rate limiting for public endpoints (contact form)
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddFixedWindowLimiter("ContactForm", limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 5;
+            limiterOptions.Window = TimeSpan.FromMinutes(15);
+            limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            limiterOptions.QueueLimit = 0;
+        });
+    });
+
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            // Serialize enums as strings (e.g., "Owner" instead of 0)
+            options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        });
     var app = builder.Build();
 
     app.UseDefaultFiles();
@@ -194,6 +212,8 @@ try
     app.UseHttpsRedirection();
 
     app.UseCors("AllowFrontend");
+
+    app.UseRateLimiter();
 
     app.UseAuthentication();
     app.UseAuthorization();

@@ -4,6 +4,7 @@ using Email.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Email.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251207023827_RemoveTeamsFeature")]
+    partial class RemoveTeamsFeature
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -288,66 +291,6 @@ namespace Email.Server.Migrations
                         .HasDatabaseName("UQ_ConfigSets_Scope");
 
                     b.ToTable("ConfigSets", (string)null);
-                });
-
-            modelBuilder.Entity("Email.Server.Models.ContactSubmissions", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(45)
-                        .HasColumnType("nvarchar(45)");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(5000)
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTime?>("ReadAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("RepliedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("UserAgent")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAtUtc")
-                        .HasDatabaseName("IX_ContactSubmissions_Created");
-
-                    b.HasIndex("Email")
-                        .HasDatabaseName("IX_ContactSubmissions_Email");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("IX_ContactSubmissions_Status");
-
-                    b.ToTable("ContactSubmissions", (string)null);
                 });
 
             modelBuilder.Entity("Email.Server.Models.DomainDnsRecords", b =>
@@ -793,7 +736,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 428, DateTimeKind.Utc).AddTicks(7550),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 2, 38, 26, 287, DateTimeKind.Utc).AddTicks(457),
                             DefaultForNewTenants = false,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -802,7 +745,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(183),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 2, 38, 26, 287, DateTimeKind.Utc).AddTicks(2099),
                             DefaultForNewTenants = true,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -811,7 +754,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(187),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 2, 38, 26, 287, DateTimeKind.Utc).AddTicks(2101),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -820,7 +763,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(188),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 2, 38, 26, 287, DateTimeKind.Utc).AddTicks(2103),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,
@@ -1095,69 +1038,6 @@ namespace Email.Server.Migrations
                         .HasDatabaseName("UQ_Templates");
 
                     b.ToTable("Templates", (string)null);
-                });
-
-            modelBuilder.Entity("Email.Server.Models.TenantInvitations", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTime?>("AcceptedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("AcceptedByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("InvitationToken")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("InvitedByUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("InviteeEmail")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvitationToken")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_TenantInvitations_Token");
-
-                    b.HasIndex("TenantId", "Status")
-                        .HasDatabaseName("IX_TenantInvitations_TenantStatus");
-
-                    b.HasIndex("TenantId", "InviteeEmail", "Status")
-                        .HasDatabaseName("IX_TenantInvitations_TenantEmailStatus");
-
-                    b.ToTable("TenantInvitations", (string)null);
                 });
 
             modelBuilder.Entity("Email.Server.Models.TenantMembers", b =>
@@ -1653,17 +1533,6 @@ namespace Email.Server.Migrations
                 });
 
             modelBuilder.Entity("Email.Server.Models.Templates", b =>
-                {
-                    b.HasOne("Email.Server.Models.Tenants", "Tenant")
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Tenant");
-                });
-
-            modelBuilder.Entity("Email.Server.Models.TenantInvitations", b =>
                 {
                     b.HasOne("Email.Server.Models.Tenants", "Tenant")
                         .WithMany()

@@ -323,5 +323,143 @@ namespace Email.Server.Controllers
                 return StatusCode(500, "An error occurred while retrieving SES health status");
             }
         }
+
+        // Invitation endpoints
+
+        /// <summary>
+        /// Send an invitation to join a tenant
+        /// </summary>
+        [HttpPost("{id}/invitations")]
+        public async Task<ActionResult<TenantInvitationResponse>> CreateInvitation(Guid id, [FromBody] CreateTenantInvitationRequest request)
+        {
+            try
+            {
+                var userId = GetUserId();
+                var invitation = await _tenantManagementService.CreateInvitationAsync(id, request.Email, request.Role, userId);
+                return CreatedAtAction(nameof(GetInvitationByToken), new { token = invitation.Token }, invitation);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating invitation for tenant {TenantId}", id);
+                return StatusCode(500, new { error = "An error occurred while creating the invitation" });
+            }
+        }
+
+        /// <summary>
+        /// Get pending invitations for a tenant
+        /// </summary>
+        [HttpGet("{id}/invitations")]
+        public async Task<ActionResult<IEnumerable<TenantInvitationResponse>>> GetPendingInvitations(Guid id)
+        {
+            try
+            {
+                var userId = GetUserId();
+                var invitations = await _tenantManagementService.GetPendingInvitationsAsync(id, userId);
+                return Ok(invitations);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting invitations for tenant {TenantId}", id);
+                return StatusCode(500, new { error = "An error occurred while retrieving invitations" });
+            }
+        }
+
+        /// <summary>
+        /// Revoke a pending invitation
+        /// </summary>
+        [HttpDelete("invitations/{invitationId}")]
+        public async Task<IActionResult> RevokeInvitation(Guid invitationId)
+        {
+            try
+            {
+                var userId = GetUserId();
+                var revoked = await _tenantManagementService.RevokeInvitationAsync(invitationId, userId);
+                if (revoked)
+                {
+                    return NoContent();
+                }
+                return NotFound();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error revoking invitation {InvitationId}", invitationId);
+                return StatusCode(500, new { error = "An error occurred while revoking the invitation" });
+            }
+        }
+
+        /// <summary>
+        /// Get invitation details by token (public endpoint for accept page)
+        /// </summary>
+        [HttpGet("invitations/token/{token}")]
+        [AllowAnonymous]
+        public async Task<ActionResult<TenantInvitationResponse>> GetInvitationByToken(string token)
+        {
+            try
+            {
+                var invitation = await _tenantManagementService.GetInvitationByTokenAsync(token);
+                if (invitation == null)
+                {
+                    return NotFound(new { error = "Invitation not found" });
+                }
+                return Ok(invitation);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting invitation by token");
+                return StatusCode(500, new { error = "An error occurred while retrieving the invitation" });
+            }
+        }
+
+        /// <summary>
+        /// Accept an invitation
+        /// </summary>
+        [HttpPost("invitations/token/{token}/accept")]
+        public async Task<ActionResult<TenantResponse>> AcceptInvitation(string token)
+        {
+            try
+            {
+                var userId = GetUserId();
+                var userEmail = User.Claims.FirstOrDefault(c => c.Type == "emails" || c.Type == ClaimTypes.Email)?.Value
+                    ?? User.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value
+                    ?? throw new UnauthorizedAccessException("User email not found in token");
+                var userDisplayName = User.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+                var tenant = await _tenantManagementService.AcceptInvitationAsync(token, userId, userEmail, userDisplayName);
+                return Ok(tenant);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error accepting invitation");
+                return StatusCode(500, new { error = "An error occurred while accepting the invitation" });
+            }
+        }
     }
 }

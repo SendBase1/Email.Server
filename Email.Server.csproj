@@ -17,6 +17,7 @@
     <PackageReference Include="AutoMapper" Version="15.1.0" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.14" />
     <PackageReference Include="AWSSDK.SimpleEmailV2" Version="4.0.7" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
@@ -29,6 +30,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Identity.Web" Version="4.1.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.AzureBlobStorage" Version="4.0.5" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Stripe.net" Version="50.0.0" />

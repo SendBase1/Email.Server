@@ -4,6 +4,7 @@ using Email.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Email.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251207061513_AddContactSubmissions")]
+    partial class AddContactSubmissions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -317,6 +320,11 @@ namespace Email.Server.Migrations
                         .HasMaxLength(5000)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -331,6 +339,11 @@ namespace Email.Server.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("UserAgent")
                         .HasMaxLength(500)
@@ -793,7 +806,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 428, DateTimeKind.Utc).AddTicks(7550),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 6, 15, 10, 657, DateTimeKind.Utc).AddTicks(3273),
                             DefaultForNewTenants = false,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -802,7 +815,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(183),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 6, 15, 10, 658, DateTimeKind.Utc).AddTicks(3529),
                             DefaultForNewTenants = true,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -811,7 +824,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(187),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 6, 15, 10, 658, DateTimeKind.Utc).AddTicks(3536),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -820,7 +833,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(188),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 6, 15, 10, 658, DateTimeKind.Utc).AddTicks(3538),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,

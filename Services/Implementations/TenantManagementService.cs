@@ -525,5 +525,268 @@ namespace Email.Server.Services.Implementations
 
             await _context.SaveChangesAsync();
         }
+
+        // Invitation methods
+
+        public async Task<TenantInvitationResponse> CreateInvitationAsync(
+            Guid tenantId,
+            string inviteeEmail,
+            TenantRole role,
+            string invitingUserId)
+        {
+            // Check if requesting user has permission
+            var requestingMember = await _context.TenantMembers
+                .Include(tm => tm.Tenant)
+                .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserId == invitingUserId);
+
+            if (requestingMember == null ||
+                (requestingMember.TenantRole != TenantRole.Owner && requestingMember.TenantRole != TenantRole.Admin))
+            {
+                throw new UnauthorizedAccessException("Only owners and admins can invite members");
+            }
+
+            // Check if user is already a member
+            var existingMember = await _context.TenantMembers
+                .FirstOrDefaultAsync(tm => tm.TenantId == tenantId && tm.UserEmail == inviteeEmail);
+
+            if (existingMember != null)
+            {
+                throw new ArgumentException("User is already a member of this workspace");
+            }
+
+            // Check if there's already a pending invitation
+            var existingInvitation = await _context.TenantInvitations
+                .FirstOrDefaultAsync(i => i.TenantId == tenantId &&
+                                         i.InviteeEmail == inviteeEmail &&
+                                         i.Status == InvitationStatus.Pending);
+
+            if (existingInvitation != null)
+            {
+                throw new ArgumentException("An invitation has already been sent to this email");
+            }
+
+            // Generate secure token
+            var token = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .TrimEnd('=');
+
+            var invitation = new TenantInvitations
+            {
+                TenantId = tenantId,
+                InviteeEmail = inviteeEmail.ToLowerInvariant(),
+                Role = role,
+                InvitedByUserId = invitingUserId,
+                InvitationToken = token,
+                Status = InvitationStatus.Pending,
+                CreatedAtUtc = DateTime.UtcNow,
+                ExpiresAtUtc = DateTime.UtcNow.AddDays(7)
+            };
+
+            _context.TenantInvitations.Add(invitation);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Created invitation for {Email} to join tenant {TenantId} with role {Role}",
+                inviteeEmail, tenantId, role);
+
+            return new TenantInvitationResponse
+            {
+                Id = invitation.Id,
+                TenantId = tenantId,
+                TenantName = requestingMember.Tenant?.Name,
+                InviteeEmail = invitation.InviteeEmail,
+                Role = invitation.Role,
+                Status = invitation.Status,
+                InvitedByEmail = requestingMember.UserEmail,
+                CreatedAtUtc = invitation.CreatedAtUtc,
+                ExpiresAtUtc = invitation.ExpiresAtUtc,
+                Token = token
+            };
+        }
+
+        public async Task<IEnumerable<TenantInvitationResponse>> GetPendingInvitationsAsync(Guid tenantId, string userId)
+        {
+            // Verify user has access
+            var hasAccess = await _context.TenantMembers
+                .AnyAsync(tm => tm.TenantId == tenantId && tm.UserId == userId);
+
+            if (!hasAccess)
+            {
+                throw new UnauthorizedAccessException("User does not have access to this tenant");
+            }
+
+            var invitations = await _context.TenantInvitations
+                .Include(i => i.Tenant)
+                .Where(i => i.TenantId == tenantId && i.Status == InvitationStatus.Pending)
+                .OrderByDescending(i => i.CreatedAtUtc)
+                .ToListAsync();
+
+            // Get inviter emails
+            var inviterIds = invitations.Select(i => i.InvitedByUserId).Distinct().ToList();
+            var inviters = await _context.TenantMembers
+                .Where(tm => inviterIds.Contains(tm.UserId))
+                .ToDictionaryAsync(tm => tm.UserId, tm => tm.UserEmail);
+
+            return invitations.Select(i => new TenantInvitationResponse
+            {
+                Id = i.Id,
+                TenantId = i.TenantId,
+                TenantName = i.Tenant?.Name,
+                InviteeEmail = i.InviteeEmail,
+                Role = i.Role,
+                Status = i.Status,
+                InvitedByEmail = inviters.GetValueOrDefault(i.InvitedByUserId),
+                CreatedAtUtc = i.CreatedAtUtc,
+                ExpiresAtUtc = i.ExpiresAtUtc
+            });
+        }
+
+        public async Task<TenantResponse> AcceptInvitationAsync(
+            string token,
+            string userId,
+            string userEmail,
+            string? userDisplayName)
+        {
+            var invitation = await _context.TenantInvitations
+                .Include(i => i.Tenant)
+                .FirstOrDefaultAsync(i => i.InvitationToken == token);
+
+            if (invitation == null)
+            {
+                throw new ArgumentException("Invalid invitation token");
+            }
+
+            if (invitation.Status != InvitationStatus.Pending)
+            {
+                throw new ArgumentException($"Invitation has already been {invitation.Status.ToString().ToLowerInvariant()}");
+            }
+
+            if (invitation.ExpiresAtUtc < DateTime.UtcNow)
+            {
+                invitation.Status = InvitationStatus.Expired;
+                await _context.SaveChangesAsync();
+                throw new ArgumentException("Invitation has expired");
+            }
+
+            // Check if user is already a member
+            var existingMember = await _context.TenantMembers
+                .FirstOrDefaultAsync(tm => tm.TenantId == invitation.TenantId && tm.UserId == userId);
+
+            if (existingMember != null)
+            {
+                invitation.Status = InvitationStatus.Accepted;
+                invitation.AcceptedAtUtc = DateTime.UtcNow;
+                invitation.AcceptedByUserId = userId;
+                await _context.SaveChangesAsync();
+
+                // Return the existing tenant info
+                var memberCount = await _context.TenantMembers.CountAsync(tm => tm.TenantId == invitation.TenantId);
+                return new TenantResponse
+                {
+                    Id = invitation.TenantId,
+                    Name = invitation.Tenant!.Name,
+                    Status = invitation.Tenant.Status,
+                    CreatedAtUtc = invitation.Tenant.CreatedAtUtc,
+                    MemberCount = memberCount,
+                    CurrentUserRole = existingMember.TenantRole
+                };
+            }
+
+            // Add user as member
+            var tenantMember = new TenantMembers
+            {
+                TenantId = invitation.TenantId,
+                UserId = userId,
+                UserEmail = userEmail.ToLowerInvariant(),
+                UserDisplayName = userDisplayName,
+                TenantRole = invitation.Role,
+                JoinedAtUtc = DateTime.UtcNow
+            };
+
+            _context.TenantMembers.Add(tenantMember);
+
+            invitation.Status = InvitationStatus.Accepted;
+            invitation.AcceptedAtUtc = DateTime.UtcNow;
+            invitation.AcceptedByUserId = userId;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} ({Email}) accepted invitation to join tenant {TenantId} with role {Role}",
+                userId, userEmail, invitation.TenantId, invitation.Role);
+
+            var newMemberCount = await _context.TenantMembers.CountAsync(tm => tm.TenantId == invitation.TenantId);
+
+            return new TenantResponse
+            {
+                Id = invitation.TenantId,
+                Name = invitation.Tenant!.Name,
+                Status = invitation.Tenant.Status,
+                CreatedAtUtc = invitation.Tenant.CreatedAtUtc,
+                MemberCount = newMemberCount,
+                CurrentUserRole = invitation.Role
+            };
+        }
+
+        public async Task<bool> RevokeInvitationAsync(Guid invitationId, string userId)
+        {
+            var invitation = await _context.TenantInvitations
+                .FirstOrDefaultAsync(i => i.Id == invitationId);
+
+            if (invitation == null)
+            {
+                return false;
+            }
+
+            // Check if user has permission
+            var requestingMember = await _context.TenantMembers
+                .FirstOrDefaultAsync(tm => tm.TenantId == invitation.TenantId && tm.UserId == userId);
+
+            if (requestingMember == null ||
+                (requestingMember.TenantRole != TenantRole.Owner && requestingMember.TenantRole != TenantRole.Admin))
+            {
+                throw new UnauthorizedAccessException("Only owners and admins can revoke invitations");
+            }
+
+            if (invitation.Status != InvitationStatus.Pending)
+            {
+                throw new ArgumentException("Can only revoke pending invitations");
+            }
+
+            invitation.Status = InvitationStatus.Revoked;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Revoked invitation {InvitationId} for {Email}", invitationId, invitation.InviteeEmail);
+
+            return true;
+        }
+
+        public async Task<TenantInvitationResponse?> GetInvitationByTokenAsync(string token)
+        {
+            var invitation = await _context.TenantInvitations
+                .Include(i => i.Tenant)
+                .FirstOrDefaultAsync(i => i.InvitationToken == token);
+
+            if (invitation == null)
+            {
+                return null;
+            }
+
+            // Get inviter email
+            var inviter = await _context.TenantMembers
+                .FirstOrDefaultAsync(tm => tm.UserId == invitation.InvitedByUserId);
+
+            return new TenantInvitationResponse
+            {
+                Id = invitation.Id,
+                TenantId = invitation.TenantId,
+                TenantName = invitation.Tenant?.Name,
+                InviteeEmail = invitation.InviteeEmail,
+                Role = invitation.Role,
+                Status = invitation.Status,
+                InvitedByEmail = inviter?.UserEmail,
+                CreatedAtUtc = invitation.CreatedAtUtc,
+                ExpiresAtUtc = invitation.ExpiresAtUtc
+            };
+        }
     }
 }

@@ -71,5 +71,32 @@ namespace Email.Server.Services.Interfaces
         /// Enables sending for all tenants owned by a user (called after email verification)
         /// </summary>
         Task EnableSendingForUserTenantsAsync(string userId);
+
+        // Invitation methods
+
+        /// <summary>
+        /// Creates an invitation to join a tenant
+        /// </summary>
+        Task<TenantInvitationResponse> CreateInvitationAsync(Guid tenantId, string inviteeEmail, TenantRole role, string invitingUserId);
+
+        /// <summary>
+        /// Gets pending invitations for a tenant
+        /// </summary>
+        Task<IEnumerable<TenantInvitationResponse>> GetPendingInvitationsAsync(Guid tenantId, string userId);
+
+        /// <summary>
+        /// Accepts an invitation by token
+        /// </summary>
+        Task<TenantResponse> AcceptInvitationAsync(string token, string userId, string userEmail, string? userDisplayName);
+
+        /// <summary>
+        /// Revokes a pending invitation
+        /// </summary>
+        Task<bool> RevokeInvitationAsync(Guid invitationId, string userId);
+
+        /// <summary>
+        /// Gets invitation details by token (public - for accept page)
+        /// </summary>
+        Task<TenantInvitationResponse?> GetInvitationByTokenAsync(string token);
     }
 }

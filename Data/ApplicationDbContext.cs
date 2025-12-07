@@ -15,6 +15,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     // Tenants & membership
     public DbSet<Tenants> Tenants { get; set; }
     public DbSet<TenantMembers> TenantMembers { get; set; }
+    public DbSet<TenantInvitations> TenantInvitations { get; set; }
 
     // Regions
     public DbSet<RegionsCatalog> RegionsCatalog { get; set; }
@@ -56,6 +57,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<StripeWebhookEvents> StripeWebhookEvents { get; set; }
     public DbSet<Invoices> Invoices { get; set; }
 
+    // Contact
+    public DbSet<ContactSubmissions> ContactSubmissions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -83,6 +87,29 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             // UserId is now just a string (Entra Object ID), not a FK to AspNetUsers
 
             entity.Property(tm => tm.TenantRole)
+                .HasConversion<string>()
+                .HasMaxLength(50);
+        });
+
+        // TenantInvitations
+        builder.Entity<TenantInvitations>(entity =>
+        {
+            entity.ToTable("TenantInvitations");
+            entity.Property(i => i.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.HasIndex(i => i.InvitationToken).IsUnique().HasDatabaseName("UQ_TenantInvitations_Token");
+            entity.HasIndex(i => new { i.TenantId, i.InviteeEmail, i.Status }).HasDatabaseName("IX_TenantInvitations_TenantEmailStatus");
+            entity.HasIndex(i => new { i.TenantId, i.Status }).HasDatabaseName("IX_TenantInvitations_TenantStatus");
+
+            entity.HasOne(i => i.Tenant)
+                .WithMany()
+                .HasForeignKey(i => i.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(i => i.Role)
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
+            entity.Property(i => i.Status)
                 .HasConversion<string>()
                 .HasMaxLength(50);
         });
@@ -502,6 +529,20 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .WithMany()
                 .HasForeignKey(i => i.TenantId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ContactSubmissions
+        builder.Entity<ContactSubmissions>(entity =>
+        {
+            entity.ToTable("ContactSubmissions");
+            entity.Property(c => c.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.HasIndex(c => c.CreatedAtUtc).HasDatabaseName("IX_ContactSubmissions_Created");
+            entity.HasIndex(c => c.Status).HasDatabaseName("IX_ContactSubmissions_Status");
+            entity.HasIndex(c => c.Email).HasDatabaseName("IX_ContactSubmissions_Email");
+
+            entity.Property(c => c.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20);
         });
     }
 }

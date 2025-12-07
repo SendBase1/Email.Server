@@ -4,6 +4,7 @@ using Email.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Email.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251207003143_AddTeamsSupport")]
+    partial class AddTeamsSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -61,6 +64,9 @@ namespace Email.Server.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -72,6 +78,8 @@ namespace Email.Server.Migrations
                     b.HasIndex("KeyPrefix")
                         .IsUnique()
                         .HasDatabaseName("UX_ApiKeys_Prefix");
+
+                    b.HasIndex("TeamId");
 
                     b.HasIndex("TenantId")
                         .HasDatabaseName("IX_ApiKeys_Tenant");
@@ -290,66 +298,6 @@ namespace Email.Server.Migrations
                     b.ToTable("ConfigSets", (string)null);
                 });
 
-            modelBuilder.Entity("Email.Server.Models.ContactSubmissions", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(45)
-                        .HasColumnType("nvarchar(45)");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(5000)
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTime?>("ReadAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("RepliedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("UserAgent")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAtUtc")
-                        .HasDatabaseName("IX_ContactSubmissions_Created");
-
-                    b.HasIndex("Email")
-                        .HasDatabaseName("IX_ContactSubmissions_Email");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("IX_ContactSubmissions_Status");
-
-                    b.ToTable("ContactSubmissions", (string)null);
-                });
-
             modelBuilder.Entity("Email.Server.Models.DomainDnsRecords", b =>
                 {
                     b.Property<long>("Id")
@@ -431,6 +379,9 @@ namespace Email.Server.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -443,6 +394,8 @@ namespace Email.Server.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Region");
+
+                    b.HasIndex("TeamId");
 
                     b.HasIndex("TenantId", "Region", "Domain")
                         .IsUnique()
@@ -793,7 +746,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 428, DateTimeKind.Utc).AddTicks(7550),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 0, 31, 41, 493, DateTimeKind.Utc).AddTicks(1497),
                             DefaultForNewTenants = false,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -802,7 +755,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(183),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 0, 31, 41, 493, DateTimeKind.Utc).AddTicks(3698),
                             DefaultForNewTenants = true,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -811,7 +764,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(187),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 0, 31, 41, 493, DateTimeKind.Utc).AddTicks(3700),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -820,7 +773,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 7, 7, 0, 47, 429, DateTimeKind.Utc).AddTicks(188),
+                            CreatedAtUtc = new DateTime(2025, 12, 7, 0, 31, 41, 493, DateTimeKind.Utc).AddTicks(3701),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,
@@ -1057,47 +1010,7 @@ namespace Email.Server.Migrations
                     b.ToTable("Suppressions", (string)null);
                 });
 
-            modelBuilder.Entity("Email.Server.Models.Templates", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("HtmlBody")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Subject")
-                        .HasMaxLength(998)
-                        .HasColumnType("nvarchar(998)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("TextBody")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Name", "Version")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_Templates");
-
-                    b.ToTable("Templates", (string)null);
-                });
-
-            modelBuilder.Entity("Email.Server.Models.TenantInvitations", b =>
+            modelBuilder.Entity("Email.Server.Models.TeamInvitations", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1142,6 +1055,9 @@ namespace Email.Server.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1149,15 +1065,141 @@ namespace Email.Server.Migrations
 
                     b.HasIndex("InvitationToken")
                         .IsUnique()
-                        .HasDatabaseName("UQ_TenantInvitations_Token");
+                        .HasDatabaseName("UQ_TeamInvitations_Token");
 
                     b.HasIndex("TenantId", "Status")
-                        .HasDatabaseName("IX_TenantInvitations_TenantStatus");
+                        .HasDatabaseName("IX_TeamInvitations_TenantStatus");
 
-                    b.HasIndex("TenantId", "InviteeEmail", "Status")
-                        .HasDatabaseName("IX_TenantInvitations_TenantEmailStatus");
+                    b.HasIndex("TeamId", "InviteeEmail", "Status")
+                        .HasDatabaseName("IX_TeamInvitations_TeamEmailStatus");
 
-                    b.ToTable("TenantInvitations", (string)null);
+                    b.ToTable("TeamInvitations", (string)null);
+                });
+
+            modelBuilder.Entity("Email.Server.Models.TeamMembers", b =>
+                {
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("InvitedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("JoinedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TeamRole")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("UserDisplayName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("UserEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("TeamId", "UserId");
+
+                    b.HasIndex("UserEmail")
+                        .HasDatabaseName("IX_TeamMembers_Email");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_TeamMembers_User");
+
+                    b.ToTable("TeamMembers", (string)null);
+                });
+
+            modelBuilder.Entity("Email.Server.Models.Teams", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IsDefault")
+                        .HasDatabaseName("IX_Teams_TenantDefault");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_Teams_TenantName");
+
+                    b.ToTable("Teams", (string)null);
+                });
+
+            modelBuilder.Entity("Email.Server.Models.Templates", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("HtmlBody")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(998)
+                        .HasColumnType("nvarchar(998)");
+
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TextBody")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("TenantId", "Name", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_Templates");
+
+                    b.ToTable("Templates", (string)null);
                 });
 
             modelBuilder.Entity("Email.Server.Models.TenantMembers", b =>
@@ -1421,6 +1463,9 @@ namespace Email.Server.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("varbinary(64)");
 
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1430,6 +1475,8 @@ namespace Email.Server.Migrations
                         .HasColumnType("nvarchar(2048)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TeamId");
 
                     b.HasIndex("TenantId");
 
@@ -1444,6 +1491,11 @@ namespace Email.Server.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("Email.Server.Models.Teams", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Email.Server.Models.Tenants", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -1451,6 +1503,8 @@ namespace Email.Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Domain");
+
+                    b.Navigation("Team");
 
                     b.Navigation("Tenant");
                 });
@@ -1485,6 +1539,11 @@ namespace Email.Server.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("Email.Server.Models.Teams", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Email.Server.Models.Tenants", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -1492,6 +1551,8 @@ namespace Email.Server.Migrations
                         .IsRequired();
 
                     b.Navigation("RegionCatalog");
+
+                    b.Navigation("Team");
 
                     b.Navigation("Tenant");
                 });
@@ -1652,7 +1713,37 @@ namespace Email.Server.Migrations
                     b.Navigation("Tenant");
                 });
 
-            modelBuilder.Entity("Email.Server.Models.Templates", b =>
+            modelBuilder.Entity("Email.Server.Models.TeamInvitations", b =>
+                {
+                    b.HasOne("Email.Server.Models.Teams", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Email.Server.Models.Tenants", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Team");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Email.Server.Models.TeamMembers", b =>
+                {
+                    b.HasOne("Email.Server.Models.Teams", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Email.Server.Models.Teams", b =>
                 {
                     b.HasOne("Email.Server.Models.Tenants", "Tenant")
                         .WithMany()
@@ -1663,13 +1754,20 @@ namespace Email.Server.Migrations
                     b.Navigation("Tenant");
                 });
 
-            modelBuilder.Entity("Email.Server.Models.TenantInvitations", b =>
+            modelBuilder.Entity("Email.Server.Models.Templates", b =>
                 {
+                    b.HasOne("Email.Server.Models.Teams", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Email.Server.Models.Tenants", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Team");
 
                     b.Navigation("Tenant");
                 });
@@ -1747,11 +1845,18 @@ namespace Email.Server.Migrations
 
             modelBuilder.Entity("Email.Server.Models.WebhookEndpoints", b =>
                 {
+                    b.HasOne("Email.Server.Models.Teams", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Email.Server.Models.Tenants", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Team");
 
                     b.Navigation("Tenant");
                 });

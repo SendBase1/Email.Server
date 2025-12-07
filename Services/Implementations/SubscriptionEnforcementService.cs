@@ -116,9 +116,9 @@ public class SubscriptionEnforcementService : ISubscriptionEnforcementService
         var domainCount = await _context.Domains
             .CountAsync(d => d.TenantId == tenantId, ct);
 
-        // Team members - for now, count is 1 (the owner)
-        // TODO: Implement team members table if needed
-        var teamMemberCount = 1;
+        // Count members directly in the tenant
+        var teamMemberCount = await _context.TenantMembers
+            .CountAsync(m => m.TenantId == tenantId, ct);
 
         var webhookCount = await _context.WebhookEndpoints
             .CountAsync(w => w.TenantId == tenantId && w.Enabled, ct);
