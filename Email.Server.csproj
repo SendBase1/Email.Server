@@ -11,13 +11,17 @@
     <OpenApiGenerateDocuments>false</OpenApiGenerateDocuments>
     <!-- Suppress CA1873: Logging with message templates is correct; analyzer false positive -->
     <NoWarn>$(NoWarn);CA1873</NoWarn>
+    <UserSecretsId>b49c28e9-51b3-4845-9ebb-73fa77630f47</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="15.1.0" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.14" />
     <PackageReference Include="AWSSDK.SimpleEmailV2" Version="4.0.7" />
+    <PackageReference Include="Azure.Data.Tables" Version="12.10.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
+    <PackageReference Include="Azure.Storage.Files.Shares" Version="12.22.0" />
+    <PackageReference Include="Azure.Storage.Queues" Version="12.22.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
@@ -28,7 +32,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Azure" Version="1.11.0" />
     <PackageReference Include="Microsoft.Identity.Web" Version="4.1.1" />
+    <PackageReference Include="Microsoft.Identity.Web.UI" Version="3.8.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.AzureBlobStorage" Version="4.0.5" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />

@@ -8,9 +8,8 @@
       "connectionId": "ConnectionStrings:DefaultConnection1",
       "dynamicId": null
     },
-    "identityapp1": {
-      "type": "identityapp",
-      "connectionId": "AzureAD:ClientSecret"
+    "secrets1": {
+      "type": "secrets"
     }
   }
 }

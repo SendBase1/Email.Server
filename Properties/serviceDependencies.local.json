@@ -1,10 +1,22 @@
 {
   "dependencies": {
-    "identityapp1": {
-      "connectionInfo": "App registration: EmailApi, Tenant: Email Customers (EmailCustomers.onmicrosoft.com - Microsoft Entra External ID)",
-      "secretStore": "LocalSecretsFile",
-      "type": "identityapp.secretStore",
-      "connectionId": "AzureAD:ClientSecret"
+    "secrets1": {
+      "type": "secrets.user"
+    },
+    "mssql1": {
+      "ignored": "true",
+      "type": "mssql",
+      "connectionId": "ConnectionStrings:DefaultConnection1",
+      "dynamicId": null
+    },
+    "mssql2": {
+      "ignored": "true",
+      "type": "mssql",
+      "connectionId": "ConnectionStrings:DefaultConnection"
+    },
+    "apis1": {
+      "ignored": "True",
+      "type": "apis"
     }
   }
 }

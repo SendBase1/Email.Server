@@ -12,6 +12,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using Microsoft.Extensions.Azure;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Identity.Web;
 
 // Configure Serilog
 var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
@@ -27,7 +30,11 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     // Add Serilog
-    builder.Host.UseSerilog();
+    builder.Host.UseSerilog()
+    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"))
+        .EnableTokenAcquisitionToCallDownstreamApi()
+            .AddMicrosoftGraph(builder.Configuration.GetSection("MicrosoftGraph"))
+            .AddInMemoryTokenCaches();
 
     // Add services to the container.
 
@@ -38,10 +45,10 @@ try
         options.UseSqlServer(connectionString);
     });
 
-    // Note: ASP.NET Identity has been removed - we now use Entra External ID for authentication
+    // Note: ASP.NET Identity has been removed - we now use Entra ID for authentication
     // Users are managed in Entra, not in the local database
 
-    // Configure Entra External ID (CIAM) Authentication
+    // Configure Entra ID Authentication
     var azureAdConfig = builder.Configuration.GetSection("AzureAd");
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
@@ -57,12 +64,9 @@ try
                 instance = $"https://{instance}";
             }
 
-            // For CIAM (External ID), use the ciamlogin.com authority
             options.Authority = $"{instance}/{tenantId}/v2.0";
             options.Audience = clientId;
 
-            // For CIAM, explicitly set valid issuers since metadata discovery may not work
-            // CIAM uses format: https://{tenantId}.ciamlogin.com/{tenantId}/v2.0
             options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
             {
                 ValidateIssuer = true,
