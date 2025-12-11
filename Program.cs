@@ -142,7 +142,7 @@ try
                     "http://localhost:5173",
                     "https://localhost:59594",
                     "https://localhost:59593",
-                    "https://www.socialhq.app",
+                    "https://www.sendbase.app",
                     "https://polite-mud-06a30121e.3.azurestaticapps.net") // Azure Static Web App
                   .AllowAnyHeader()
                   .AllowAnyMethod()
