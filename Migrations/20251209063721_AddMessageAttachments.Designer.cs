@@ -4,6 +4,7 @@ using Email.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Email.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251209063721_AddMessageAttachments")]
+    partial class AddMessageAttachments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -32,7 +35,7 @@ namespace Email.Server.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("DomainId")
+                    b.Property<Guid>("DomainId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("IsRevoked")
@@ -419,12 +422,6 @@ namespace Email.Server.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("nvarchar(2048)");
 
-                    b.Property<bool>("InboundEnabled")
-                        .HasColumnType("bit");
-
-                    b.Property<byte>("InboundStatus")
-                        .HasColumnType("tinyint");
-
                     b.Property<byte>("MailFromStatus")
                         .HasColumnType("tinyint");
 
@@ -467,14 +464,6 @@ namespace Email.Server.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("NEWSEQUENTIALID()");
 
-                    b.Property<string>("BlobKey")
-                        .IsRequired()
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
-
-                    b.Property<Guid?>("DomainId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("FromAddress")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -482,9 +471,6 @@ namespace Email.Server.Migrations
 
                     b.Property<string>("ParsedJson")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ProcessedAtUtc")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("ReceivedAtUtc")
                         .HasColumnType("datetime2");
@@ -499,12 +485,10 @@ namespace Email.Server.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
-                    b.Property<string>("SesMessageId")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<long?>("SizeBytes")
-                        .HasColumnType("bigint");
+                    b.Property<string>("S3ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<string>("Subject")
                         .HasMaxLength(998)
@@ -514,9 +498,6 @@ namespace Email.Server.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DomainId")
-                        .HasDatabaseName("IX_InboundMessages_DomainId");
 
                     b.HasIndex("Region");
 
@@ -862,7 +843,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 10, 7, 39, 52, 443, DateTimeKind.Utc).AddTicks(5910),
+                            CreatedAtUtc = new DateTime(2025, 12, 9, 6, 37, 18, 367, DateTimeKind.Utc).AddTicks(2348),
                             DefaultForNewTenants = false,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -871,7 +852,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 10, 7, 39, 52, 444, DateTimeKind.Utc).AddTicks(158),
+                            CreatedAtUtc = new DateTime(2025, 12, 9, 6, 37, 18, 367, DateTimeKind.Utc).AddTicks(6639),
                             DefaultForNewTenants = true,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -880,7 +861,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 10, 7, 39, 52, 444, DateTimeKind.Utc).AddTicks(164),
+                            CreatedAtUtc = new DateTime(2025, 12, 9, 6, 37, 18, 367, DateTimeKind.Utc).AddTicks(6643),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -889,7 +870,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 10, 7, 39, 52, 444, DateTimeKind.Utc).AddTicks(167),
+                            CreatedAtUtc = new DateTime(2025, 12, 9, 6, 37, 18, 367, DateTimeKind.Utc).AddTicks(6645),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,
@@ -1510,7 +1491,8 @@ namespace Email.Server.Migrations
                     b.HasOne("Email.Server.Models.Domains", "Domain")
                         .WithMany()
                         .HasForeignKey("DomainId")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
 
                     b.HasOne("Email.Server.Models.Tenants", "Tenant")
                         .WithMany()
@@ -1566,11 +1548,6 @@ namespace Email.Server.Migrations
 
             modelBuilder.Entity("Email.Server.Models.InboundMessages", b =>
                 {
-                    b.HasOne("Email.Server.Models.Domains", "Domain")
-                        .WithMany()
-                        .HasForeignKey("DomainId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("Email.Server.Models.RegionsCatalog", "RegionCatalog")
                         .WithMany()
                         .HasForeignKey("Region")
@@ -1582,8 +1559,6 @@ namespace Email.Server.Migrations
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
-
-                    b.Navigation("Domain");
 
                     b.Navigation("RegionCatalog");
 

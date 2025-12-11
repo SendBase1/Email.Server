@@ -34,6 +34,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Messages> Messages { get; set; }
     public DbSet<MessageRecipients> MessageRecipients { get; set; }
     public DbSet<MessageTags> MessageTags { get; set; }
+    public DbSet<MessageAttachments> MessageAttachments { get; set; }
 
     // Events & Analytics
     public DbSet<MessageEvents> MessageEvents { get; set; }
@@ -221,7 +222,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.HasOne(a => a.Domain)
                 .WithMany()
                 .HasForeignKey(a => a.DomainId)
-                .OnDelete(DeleteBehavior.NoAction); // NoAction to avoid cascade cycle with Tenant
+                .OnDelete(DeleteBehavior.NoAction); // Manual cleanup in DomainManagementService
         });
 
         // Messages
@@ -270,6 +271,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.HasOne(mt => mt.Message)
                 .WithMany()
                 .HasForeignKey(mt => mt.MessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // MessageAttachments
+        builder.Entity<MessageAttachments>(entity =>
+        {
+            entity.ToTable("MessageAttachments");
+            entity.HasIndex(ma => ma.MessageId).HasDatabaseName("IX_MessageAttachments_Message");
+
+            entity.HasOne(ma => ma.Message)
+                .WithMany()
+                .HasForeignKey(ma => ma.MessageId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -357,11 +370,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.ToTable("InboundMessages");
             entity.Property(i => i.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
             entity.HasIndex(i => new { i.TenantId, i.ReceivedAtUtc }).HasDatabaseName("IX_InboundMessages_Tenant_Time");
+            entity.HasIndex(i => i.DomainId).HasDatabaseName("IX_InboundMessages_DomainId");
 
             entity.HasOne(i => i.Tenant)
                 .WithMany()
                 .HasForeignKey(i => i.TenantId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(i => i.Domain)
+                .WithMany()
+                .HasForeignKey(i => i.DomainId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasOne(i => i.RegionCatalog)
                 .WithMany()

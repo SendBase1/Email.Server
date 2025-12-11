@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Amazon.S3;
 using Email.Server.Authentication;
 using Email.Server.Configuration;
 using Email.Server.Data;
@@ -12,7 +13,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using Microsoft.Extensions.Azure;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Identity.Web;
 using Scalar.AspNetCore;
@@ -113,6 +113,10 @@ try
     builder.Services.AddAuthorizationBuilder()
         .AddPolicy(ApiKeyScopes.EmailsSend, policy =>
             policy.AddRequirements(new ApiKeyScopeRequirement(ApiKeyScopes.EmailsSend)))
+        .AddPolicy(ApiKeyScopes.EmailsRead, policy =>
+            policy.AddRequirements(new ApiKeyScopeRequirement(ApiKeyScopes.EmailsRead)))
+        .AddPolicy(ApiKeyScopes.EmailsWrite, policy =>
+            policy.AddRequirements(new ApiKeyScopeRequirement(ApiKeyScopes.EmailsWrite)))
         .AddPolicy(ApiKeyScopes.DomainsRead, policy =>
             policy.AddRequirements(new ApiKeyScopeRequirement(ApiKeyScopes.DomainsRead)))
         .AddPolicy(ApiKeyScopes.DomainsWrite, policy =>
@@ -173,6 +177,20 @@ try
     builder.Services.AddScoped<ITemplateService, TemplateService>();
     builder.Services.AddScoped<IWebhookDeliveryService, WebhookDeliveryService>();
     builder.Services.AddScoped<ISesNotificationService, SesNotificationService>();
+
+    // AWS S3 for email attachments and inbound emails
+    builder.Services.AddSingleton<IAmazonS3>(sp =>
+    {
+        var config = new AmazonS3Config
+        {
+            RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(
+                builder.Configuration["AWS:Region"] ?? "us-west-2")
+        };
+        return new AmazonS3Client(config);
+    });
+    builder.Services.AddScoped<IAttachmentStorageService, AttachmentStorageService>();
+    builder.Services.AddScoped<IInboundEmailStorageService, InboundEmailStorageService>();
+    builder.Services.AddScoped<IInboundEmailService, InboundEmailService>();
 
     // Billing Services
     builder.Services.AddScoped<IBillingService, BillingService>();
