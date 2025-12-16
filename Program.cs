@@ -275,6 +275,9 @@ try
 
     app.MapControllers();
 
+    // Health check endpoint
+    app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
     app.MapFallbackToFile("/index.html");
 
     app.Run();
