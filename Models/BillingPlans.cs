@@ -45,6 +45,8 @@ public class BillingPlans
 
     public bool AllowsSmsOverage { get; set; } = true;
 
+    public int MaxSmsPhoneNumbers { get; set; } = 1;
+
     // Push notification limits
     public int IncludedPush { get; set; } = 0;
 

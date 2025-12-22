@@ -37,6 +37,8 @@ public class UsagePeriods
 
     public long OverageSmsReportedToStripe { get; set; }
 
+    public DateTime? LastSmsStripeReportUtc { get; set; }
+
     // Push notification tracking
     public long PushSent { get; set; }
 

@@ -110,12 +110,24 @@ public class EmailSendingService : IEmailSendingService
         // Determine if this is a scheduled send
         var isScheduled = request.ScheduledAtUtc.HasValue && request.ScheduledAtUtc.Value > DateTime.UtcNow;
 
+        // Resolve ConfigSetId - use request value or find default for the region
+        Guid? resolvedConfigSetId = request.ConfigSetId;
+        if (!resolvedConfigSetId.HasValue)
+        {
+            var defaultConfigSet = await _context.ConfigSets
+                .FirstOrDefaultAsync(cs => cs.SesRegionId == sesRegion.Id && cs.IsDefault, cancellationToken);
+            if (defaultConfigSet != null)
+            {
+                resolvedConfigSetId = defaultConfigSet.Id;
+            }
+        }
+
         // Create message entity (store rendered content)
         var message = new Messages
         {
             TenantId = tenantId,
             Region = domain.Region,
-            ConfigSetId = request.ConfigSetId,
+            ConfigSetId = resolvedConfigSetId,
             FromEmail = request.FromEmail,
             FromName = request.FromName,
             Subject = subject,
@@ -291,24 +303,15 @@ public class EmailSendingService : IEmailSendingService
         // Send via SES
         try
         {
-            // Determine configuration set
+            // Get configuration set name from the resolved ConfigSetId
             string? configurationSetName = null;
-            if (request.ConfigSetId.HasValue)
+            if (resolvedConfigSetId.HasValue)
             {
-                var configSet = await _context.ConfigSets.FindAsync(request.ConfigSetId.Value);
+                var configSet = await _context.ConfigSets.FindAsync(resolvedConfigSetId.Value);
                 if (configSet != null)
                 {
                     configurationSetName = configSet.ConfigSetName;
-                }
-            }
-            else
-            {
-                var defaultConfigSet = await _context.ConfigSets
-                    .FirstOrDefaultAsync(cs => cs.SesRegionId == sesRegion.Id && cs.IsDefault, cancellationToken);
-                if (defaultConfigSet != null)
-                {
-                    configurationSetName = defaultConfigSet.ConfigSetName;
-                    _logger.LogDebug("Using default ConfigSet '{ConfigSetName}' for email", configurationSetName);
+                    _logger.LogDebug("Using ConfigSet '{ConfigSetName}' for email", configurationSetName);
                 }
             }
 

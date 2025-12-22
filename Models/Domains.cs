@@ -11,6 +11,8 @@ public class Domains
     [ForeignKey("Tenant")]
     public Guid TenantId { get; set; }
 
+    public Guid? TeamId { get; set; }
+
     [ForeignKey("RegionCatalog")]
     [MaxLength(32)]
     public required string Region { get; set; }

@@ -4,6 +4,7 @@ using Email.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Email.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251222064056_AddMaxSmsPhoneNumbers")]
+    partial class AddMaxSmsPhoneNumbers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -485,9 +488,6 @@ namespace Email.Server.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
-                    b.Property<Guid?>("TeamId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -913,7 +913,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-east-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 22, 6, 57, 52, 578, DateTimeKind.Utc).AddTicks(9000),
+                            CreatedAtUtc = new DateTime(2025, 12, 22, 6, 40, 53, 997, DateTimeKind.Utc).AddTicks(4832),
                             DefaultForNewTenants = false,
                             DisplayName = "US East (N. Virginia)",
                             ReceiveSupported = true,
@@ -922,7 +922,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "us-west-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 22, 6, 57, 52, 579, DateTimeKind.Utc).AddTicks(903),
+                            CreatedAtUtc = new DateTime(2025, 12, 22, 6, 40, 53, 997, DateTimeKind.Utc).AddTicks(6932),
                             DefaultForNewTenants = true,
                             DisplayName = "US West (Oregon)",
                             ReceiveSupported = true,
@@ -931,7 +931,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "eu-west-1",
-                            CreatedAtUtc = new DateTime(2025, 12, 22, 6, 57, 52, 579, DateTimeKind.Utc).AddTicks(906),
+                            CreatedAtUtc = new DateTime(2025, 12, 22, 6, 40, 53, 997, DateTimeKind.Utc).AddTicks(6935),
                             DefaultForNewTenants = false,
                             DisplayName = "EU (Ireland)",
                             ReceiveSupported = true,
@@ -940,7 +940,7 @@ namespace Email.Server.Migrations
                         new
                         {
                             Region = "ap-southeast-2",
-                            CreatedAtUtc = new DateTime(2025, 12, 22, 6, 57, 52, 579, DateTimeKind.Utc).AddTicks(908),
+                            CreatedAtUtc = new DateTime(2025, 12, 22, 6, 40, 53, 997, DateTimeKind.Utc).AddTicks(6936),
                             DefaultForNewTenants = false,
                             DisplayName = "APAC (Sydney)",
                             ReceiveSupported = true,
@@ -1663,9 +1663,6 @@ namespace Email.Server.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<DateTime?>("LastPushStripeReportUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("LastSmsStripeReportUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("LastStripeReportUtc")
