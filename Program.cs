@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Amazon.PinpointSMSVoiceV2;
 using Amazon.S3;
 using Amazon.SimpleNotificationService;
 using Email.Server.Authentication;
@@ -250,10 +251,38 @@ try
         return new AmazonSimpleNotificationServiceClient(config);
     });
 
+    // AWS Pinpoint SMS Voice V2 for phone number provisioning
+    builder.Services.AddSingleton<IAmazonPinpointSMSVoiceV2>(sp =>
+    {
+        var smsSettings = builder.Configuration
+            .GetSection(AwsSmsSettings.SectionName)
+            .Get<AwsSmsSettings>();
+        var region = smsSettings?.Region ?? builder.Configuration["AWS:Region"] ?? "us-west-2";
+
+        var config = new AmazonPinpointSMSVoiceV2Config
+        {
+            RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(region)
+        };
+
+        // Use explicit credentials if configured (for Azure App Service)
+        var accessKeyId = builder.Configuration["AWS:AccessKeyId"];
+        var secretAccessKey = builder.Configuration["AWS:SecretAccessKey"];
+
+        if (!string.IsNullOrEmpty(accessKeyId) && !string.IsNullOrEmpty(secretAccessKey))
+        {
+            var credentials = new Amazon.Runtime.BasicAWSCredentials(accessKeyId, secretAccessKey);
+            return new AmazonPinpointSMSVoiceV2Client(credentials, config);
+        }
+
+        // Fall back to default credential chain (env vars, IAM role, etc.)
+        return new AmazonPinpointSMSVoiceV2Client(config);
+    });
+
     // SMS Services (uses SNS for transactional SMS)
     builder.Services.AddScoped<ISmsClientService, AwsSmsClientService>();
     builder.Services.AddScoped<ISmsService, SmsService>();
     builder.Services.AddScoped<ISmsTemplateService, SmsTemplateService>();
+    builder.Services.AddScoped<ISmsPhoneNumberService, SmsPhoneNumberService>();
 
     // Push Notification Services
     builder.Services.AddScoped<Email.Shared.Services.Interfaces.IPushClientService, AwsPushClientService>();

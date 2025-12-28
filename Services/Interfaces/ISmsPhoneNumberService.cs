@@ -1,3 +1,4 @@
+using Email.Server.DTOs.Requests;
 using Email.Server.DTOs.Responses;
 using Email.Server.Models;
 
@@ -29,4 +30,14 @@ public interface ISmsPhoneNumberService
     /// Validates that a phone number belongs to the tenant and is active.
     /// </summary>
     Task<SmsPhoneNumbers?> ValidatePhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Provisions a new phone number for the tenant via AWS End User Messaging SMS.
+    /// </summary>
+    Task<SmsPhoneNumberResponse> ProvisionPhoneNumberAsync(ProvisionPhoneNumberRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Releases a phone number back to AWS.
+    /// </summary>
+    Task<bool> ReleasePhoneNumberAsync(Guid id, CancellationToken cancellationToken = default);
 }

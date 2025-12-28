@@ -365,5 +365,62 @@ public class SmsController(
         }
     }
 
+    /// <summary>
+    /// Provision a new phone number for the tenant
+    /// </summary>
+    [HttpPost("phone-numbers")]
+    [Authorize(Policy = "sms:write")]
+    public async Task<IActionResult> ProvisionPhoneNumber([FromBody] ProvisionPhoneNumberRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var result = await _phoneNumberService.ProvisionPhoneNumberAsync(request, cancellationToken);
+            return CreatedAtAction(nameof(GetPhoneNumber), new { id = result.Id }, result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error provisioning phone number");
+            return StatusCode(500, new { error = "An error occurred while provisioning the phone number" });
+        }
+    }
+
+    /// <summary>
+    /// Release (delete) a phone number
+    /// </summary>
+    [HttpDelete("phone-numbers/{id:guid}")]
+    [Authorize(Policy = "sms:write")]
+    public async Task<IActionResult> ReleasePhoneNumber(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _phoneNumberService.ReleasePhoneNumberAsync(id, cancellationToken);
+
+            if (!result)
+            {
+                return NotFound(new { error = $"Phone number {id} not found" });
+            }
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error releasing phone number {PhoneNumberId}", id);
+            return StatusCode(500, new { error = "An error occurred while releasing the phone number" });
+        }
+    }
+
     #endregion
 }
