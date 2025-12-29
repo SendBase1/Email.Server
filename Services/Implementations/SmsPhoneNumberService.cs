@@ -228,14 +228,9 @@ public class SmsPhoneNumberService : ISmsPhoneNumberService
             return false;
         }
 
-        // Don't allow releasing the last/default phone number
+        // Check if there are other active numbers (for default assignment)
         var otherActiveNumbers = await _context.SmsPhoneNumbers
             .CountAsync(p => p.TenantId == tenantId && p.Id != id && p.IsActive, cancellationToken);
-
-        if (otherActiveNumbers == 0)
-        {
-            throw new InvalidOperationException("Cannot release the only active phone number.");
-        }
 
         try
         {
